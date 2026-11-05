@@ -395,8 +395,12 @@ details.more[open] > summary { background: var(--surface); border-radius: var(--
 
 /* v20: 연구 기반 조언 */
 .item.adv.done { box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 45%, transparent) inset; }
-.trybox { display: grid; gap: 6px; }
-.trybub { justify-self: start; max-width: 92%; background: var(--tint); color: #fff; padding: 9px 13px; border-radius: 18px 18px 18px 6px; font-size: 15px; line-height: 1.45; }
+.trybox { display: grid; gap: 6px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 10px 12px; }
+.trybox .k .cap { font-size: 12px; }
+.tryq { font-size: 15px; line-height: 1.5; color: var(--fg); }
+.exbox { display: grid; gap: 8px; }
+.exbox .scene { background: var(--fill); }
+.exnote { font-size: 13px; color: var(--muted); text-align: center; margin-top: -2px; }
 .copybtn { justify-self: start; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 13px; font-weight: 600; color: var(--tint); background: var(--fill); border: 0; border-radius: 99px; padding: 5px 11px; cursor: pointer; }
 .copybtn svg { width: 14px; height: 14px; }
 details.sci { background: var(--fill); border-radius: 12px; padding: 8px 12px; }

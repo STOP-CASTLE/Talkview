@@ -655,7 +655,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       const idx = Object.fromEntries(state.group.people.map((p, i) => [p.name, i]));
       return `<div class="scene gscene"><header><b>${e(title)}</b><span>${U.fmtDate(sc.date)}</span></header>${sc.lines.map((l, i) => `<div class="bub g" style="--gc:${gcol(idx[l.who] ?? 9)};animation-delay:${i * 0.08}s"><small>${e(l.who)} · ${e(U.hm(new Date(l.t).getHours() * 60 + new Date(l.t).getMinutes()))}</small>${e(l.text)}</div>`).join("")}</div>`;
     }
-    return `<div class="scene"><header><b>${e(title)}</b><span>${U.fmtDate(sc.date)}</span></header>${sc.lines.map((l, i) => `<div class="bub ${l.who === A() ? "a" : "b"}" style="animation-delay:${i * 0.08}s"><small>${e(l.who)} · ${e(U.hm(new Date(l.t).getHours() * 60 + new Date(l.t).getMinutes()))}</small>${e(l.text)}</div>`).join("")}</div>`;
+    return `<div class="scene"><header><b>${e(title)}</b><span>${U.fmtDate(sc.date)}</span></header>${sc.lines.map((l, i) => `<div class="bub ${l.who === A() ? "a" : "b"}" style="animation-delay:${i * 0.08}s"><small>${e(l.who)}${sc.noTime ? "" : ` · ${e(U.hm(new Date(l.t).getHours() * 60 + new Date(l.t).getMinutes()))}`}</small>${e(l.text)}</div>`).join("")}</div>`;
   }
   const monthLabels = keys => keys.map(k => { const [y, m] = k.split("-"); return m === "01" || k === keys[0] ? `${y.slice(2)}.${+m}` : `${+m}월`; });
 
@@ -1137,15 +1137,16 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       const a = state.adv, s = state.sum.advice, done = missions();
       let h = read("더 사랑하려면", "최근 90일, 우리는 어땠을까", s);
       if (a.lights.length) h += block("여섯 가지 신호", `<div class="lights">${a.lights.map(l => `<div class="light ${l.color}"><span class="sig">${e(l.label)}</span><span class="num">${l.change > 0 ? "+" : ""}${l.change}%</span></div>`).join("")}</div>`, "최근 90일과 그 이전을 비교했어요. 초록은 괜찮음, 노랑은 조금 줄어듦, 빨강은 많이 줄어듦이에요. 서운함은 늘수록 빨강이에요.");
-      const tryBox = t => t ? `<div class="trybox"><div class="k">이렇게 보내 보세요</div><div class="trybub">${e(t)}</div><button class="copybtn" type="button" data-copy="${e(t)}">${ico("chat")}복사하기</button></div>` : "";
+      const tryBox = t => t ? `<div class="trybox"><div class="k">TALK VIEW가 써 본 예시 문장 <span class="cap">(우리 카톡 아님)</span></div><p class="tryq">“${e(t)}”</p><button class="copybtn" type="button" data-copy="${e(t)}">${ico("chat")}복사해서 쓰기</button></div>` : "";
+      const scenesBox = list => list && list.length ? `<div class="exbox"><div class="k">우리 카톡에서 찾은 장면</div>${list.map(x => scene(Object.assign({}, x, { lines: x.lines.slice(0, 6) }), x.title) + (x.note ? `<p class="exnote">${e(x.note)}</p>` : "")).join("")}</div>` : "";
       const sci = x => x ? `<details class="sci"><summary>연구에서는</summary><p>${e(x)}</p></details>` : "";
       const item = (it, i, mission) => {
         const key = it.title, on = !!done[key];
-        return `<div class="item adv${on ? " done" : ""}"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)} <span class="pill ${it.level}">${{ high: "먼저", mid: "보통", low: "가볍게" }[it.level]}</span></h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div><div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div>${tryBox(it.try)}${sci(it.sci)}${mission ? `<label class="mission"><input type="checkbox" data-mission="${e(key)}"${on ? " checked" : ""}><span>${on ? "해 봤어요! 잘했어요" : "이번 주에 해 보면 체크해 두세요"}</span></label>` : ""}</div>`;
+        return `<div class="item adv${on ? " done" : ""}"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)} <span class="pill ${it.level}">${{ high: "먼저", mid: "보통", low: "가볍게" }[it.level]}</span></h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div>${scenesBox(it.scenes)}<div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div>${tryBox(it.try)}${sci(it.sci)}${mission ? `<label class="mission"><input type="checkbox" data-mission="${e(key)}"${on ? " checked" : ""}><span>${on ? "해 봤어요! 잘했어요" : "이번 주에 해 보면 체크해 두세요"}</span></label>` : ""}</div>`;
       };
       if (a.top.length) h += block("이번 주에 해 볼 세 가지", `<div class="items">${a.top.map((it, i) => item(it, i, true)).join("")}</div>`, "체크는 이 기기에만 남아요.");
       if (a.items.length > 3) h += block("그 밖에 살펴볼 것", `<div class="items">${a.items.slice(3).map(it => item(it)).join("")}</div>`);
-      if (a.good.length) h += block("잘하고 있어요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">잘함</span></h4><p>${e(g.why)}</p>${sci(g.sci)}</div>`).join("")}</div>`);
+      if (a.good.length) h += block("잘하고 있어요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">잘함</span></h4><p>${e(g.why)}</p>${scenesBox(g.scenes)}${sci(g.sci)}</div>`).join("")}</div>`);
       if (a.questions) {
         const day = Math.floor(Date.now() / 864e5), qs = [0, 7, 13].map(k => a.questions[(day + k) % a.questions.length]);
         h += block("오늘의 질문", `<div class="items">${qs.map(q => `<div class="item qitem"><p>${e(q)}</p><button class="copybtn" type="button" data-copy="${e(q)}">${ico("chat")}복사하기</button></div>`).join("")}</div>`, "서로를 더 알아 가는 질문이에요. 매일 바뀌어요. 오래 만나도 아직 모르는 게 꼭 있어요.");

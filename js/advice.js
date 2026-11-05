@@ -56,6 +56,8 @@
   // v20 연구 기반 습관 항목 (최근·이전 비교가 없어도 나옴)
   function habitItems(r, add, nice) {
     const [A, B] = r.people, h = r.habits, other = x => x === A ? B : A, p = x => Math.round(x * 100) + "%";
+    const EX = (h && h.ex) || {};
+    const sc = (key, title) => EX[key] ? Object.assign({ title }, EX[key]) : null;
     if (h) {
       // 1) 신호에 답하기
       const ga = h.people[A], gb = h.people[B];
@@ -64,8 +66,9 @@
         const [lowP, lowR, hiR] = ra <= rb ? [A, ra, rb] : [B, rb, ra]; // lowP가 보낸 신호가 덜 받아졌다
         if (lowR < 0.5 && hiR - lowR >= 0.12) add("high", `${other(lowP)}의 답이 한 박자 느려요`,
           `${U.iga(lowP)} 사진·링크를 보내거나 '있잖아'처럼 이야기를 꺼냈을 때, ${U.iga(other(lowP))} 30분 안에 'ㅇㅇ'보다 긴 답을 한 건 ${p(lowR)}예요. 반대 방향은 ${p(hiR)}예요. (바빠서 늦은 답도 섞여 있어요)`,
-          `${U.eunneun(other(lowP))} ${U.iga(lowP)} 무언가 보여 주면, 짧더라도 그 내용에 질문 하나를 붙여 답해 보세요. 답이 늦을 땐 '지금 바빠서 이따 자세히 볼게!' 한 줄이면 충분해요.`, "bids", "오 이거 뭐야ㅋㅋ 어디서 봤어? 이따 자세히 얘기해 줘!");
-        else if (Math.min(ra, rb) >= 0.75) nice("서로의 신호에 잘 답해요", `무언가 보여 주거나 이야기를 꺼냈을 때 30분 안에 제대로 답한 비율이 ${A} 쪽 ${p(rb)}, ${B} 쪽 ${p(ra)}예요.`, "bids");
+          `${U.eunneun(other(lowP))} ${U.iga(lowP)} 무언가 보여 주면, 짧더라도 그 내용에 질문 하나를 붙여 답해 보세요. 답이 늦을 땐 '지금 바빠서 이따 자세히 볼게!' 한 줄이면 충분해요.`, "bids", "오 이거 뭐야ㅋㅋ 어디서 봤어? 이따 자세히 얘기해 줘!",
+          [sc("bidMiss:" + lowP, "답이 짧았던 순간"), sc("bidGood:" + lowP, "이렇게 잘 이어진 날도 있었어요")]);
+        else if (Math.min(ra, rb) >= 0.75) nice("서로의 신호에 잘 답해요", `무언가 보여 주거나 이야기를 꺼냈을 때 30분 안에 제대로 답한 비율이 ${A} 쪽 ${p(rb)}, ${B} 쪽 ${p(ra)}예요.`, "bids", [sc("bidGood:" + A, "이렇게 이어졌어요")]);
       }
       // 2) 좋은 소식에 반응하기
       for (const x of [A, B]) {
@@ -74,8 +77,9 @@
           const rate = q.newsCele / q.news;
           if (rate < 0.5) add("mid", `${x}의 좋은 소식에 더 크게`,
             `${U.iga(x)} 합격·성공·칭찬 같은 좋은 소식을 전한 ${q.news}번 중, ${U.iga(other(x))} '축하해', '대박' 같은 말로 함께 기뻐한 건 ${q.newsCele}번이에요.`,
-            `${U.eunneun(other(x))} 다음 좋은 소식에 축하 한마디 뒤에 질문을 하나 더 붙여 보세요. 어떻게 된 건지, 그때 기분이 어땠는지요.`, "acr", "대박!! 진짜 축하해 🎉 어떻게 된 거야? 처음부터 다 얘기해 줘");
-          else if (rate >= 0.7) nice(`${x}의 좋은 소식에 함께 기뻐해요`, `${U.iga(x)} 좋은 소식을 전한 ${q.news}번 중 ${q.newsCele}번을 ${U.iga(other(x))} 크게 축하해 줬어요.`, "acr");
+            `${U.eunneun(other(x))} 다음 좋은 소식에 축하 한마디 뒤에 질문을 하나 더 붙여 보세요. 어떻게 된 건지, 그때 기분이 어땠는지요.`, "acr", "대박!! 진짜 축하해 🎉 어떻게 된 거야? 처음부터 다 얘기해 줘",
+            [sc("newsMiss:" + x, "좋은 소식을 전했던 날"), sc("newsGood:" + x, "이렇게 함께 기뻐한 날도 있었어요")]);
+          else if (rate >= 0.7) nice(`${x}의 좋은 소식에 함께 기뻐해요`, `${U.iga(x)} 좋은 소식을 전한 ${q.news}번 중 ${q.newsCele}번을 ${U.iga(other(x))} 크게 축하해 줬어요.`, "acr", [sc("newsGood:" + x, "함께 기뻐한 날")]);
         }
       }
       // 3) 고마움 균형
@@ -84,36 +88,37 @@
         const [lo, hi, lov, hiv] = ta <= tb ? [A, B, ta, tb] : [B, A, tb, ta];
         if (lov <= hiv * 0.5) add("mid", `${lo}의 '고마워'가 적어요`,
           `'고마워'가 들어간 말이 글 1000개당 ${hi} ${U.num1(hiv)}번, ${lo} ${U.num1(lov)}번이에요.`,
-          `${U.eunneun(lo)} 하루에 한 번, ${U.iga(hi)} 해 준 일 하나를 골라 이유와 함께 고마움을 말해 보세요.`, "gratitude", "오늘 점심 챙겨 줘서 고마워. 덕분에 오후 내내 기분 좋았어");
-        else if (lov >= 20) nice("고마움을 자주 말해요", `두 사람 모두 글 1000개당 '고마워'를 ${U.num1(lov)}번 넘게 말해요.`, "gratitude");
+          `${U.eunneun(lo)} 하루에 한 번, ${U.iga(hi)} 해 준 일 하나를 골라 이유와 함께 고마움을 말해 보세요. ${EX["thanks:" + hi] ? `아래처럼 ${U.iga(hi)} 보낸 말이 좋은 본보기예요.` : ""}`, "gratitude", "오늘 점심 챙겨 줘서 고마워. 덕분에 오후 내내 기분 좋았어",
+          [sc("thanks:" + hi, `${U.iga(hi)} 보낸 고마움`), sc("thanks:" + lo, `${lo}의 고마움도 있었어요`)]);
+        else if (lov >= 20) nice("고마움을 자주 말해요", `두 사람 모두 글 1000개당 '고마워'를 ${U.num1(lov)}번 넘게 말해요.`, "gratitude", [sc("thanks:" + A, "이런 고마움"), sc("thanks:" + B, "이런 고마움")]);
       }
       // 4) 아침·밤 인사
       const ms = h.morningShare, ns = h.nightShare;
       if (h.recDays >= 30 && h.oldDays >= 30) {
         if (ns.old >= 0.4 && ns.rec <= ns.old - 0.2) add("mid", "'잘 자' 인사가 뜸해졌어요",
           `이전엔 이야기한 날의 ${p(ns.old)}에 '잘 자' 인사가 있었는데, 최근 90일엔 ${p(ns.rec)}예요.`,
-          "자기 전 인사를 둘만의 작은 의식으로 만들어 보세요. 오늘 고마웠던 것 하나를 같이 말하면 더 좋아요.", "rituals", "오늘도 수고했어. 오늘 제일 좋았던 건 너랑 점심 먹은 거! 잘 자 💤");
+          "자기 전 인사를 둘만의 작은 의식으로 만들어 보세요. 오늘 고마웠던 것 하나를 같이 말하면 더 좋아요.", "rituals", "오늘도 수고했어. 오늘 제일 좋았던 건 너랑 점심 먹은 거! 잘 자 💤", [sc("nightOld", "예전엔 이렇게 인사했어요")]);
         else if (ns.rec >= 0.7 && ms.rec >= 0.5) nice("하루의 시작과 끝을 함께해요", `최근 90일, 이야기한 날의 ${p(ms.rec)}에 아침 인사가, ${p(ns.rec)}에 '잘 자'가 있었어요.`, "rituals");
       }
       // 5) 따뜻한 말 : 서운한 말
       const wr = h.conf.rec ? h.warm.rec / h.conf.rec : null, wo = h.conf.all ? h.warm.all / h.conf.all : null;
       if (h.conf.rec >= 5 && wr != null && wr < 5) add("high", "따뜻한 말보다 서운한 말이 늘었어요",
         `최근 90일, 사랑·고마움·웃음이 담긴 말풍선 ${U.num(h.warm.rec)}개에 서운함·짜증이 담긴 말풍선 ${U.num(h.conf.rec)}개예요. 1개당 ${U.num1(wr)}개꼴이에요. (말을 세어 본 근사치라 연구와 같은 기준은 아니에요)`,
-          "서운한 말 하나를 하게 되면, 그날 안에 따뜻한 말 다섯 개를 채워 보세요. 고마움, 칭찬, 웃음 모두 좋아요.", "ratio", "아까는 내가 예민했어. 그래도 오늘 너 덕분에 웃은 거 세 번은 넘어ㅋㅋ");
-      else if (wr != null && wr >= 20 && h.warm.rec >= 100) nice("따뜻한 말이 훨씬 많아요", `최근 90일, 서운한 말 1개당 따뜻한 말이 ${U.num(Math.round(wr))}개꼴이에요.`, "ratio");
+          "서운한 말 하나를 하게 되면, 그날 안에 따뜻한 말 다섯 개를 채워 보세요. 고마움, 칭찬, 웃음 모두 좋아요.", "ratio", "아까는 내가 예민했어. 그래도 오늘 너 덕분에 웃은 거 세 번은 넘어ㅋㅋ", [sc("warmRec", "요즘에도 이런 말은 있었어요")]);
+      else if (wr != null && wr >= 20 && h.warm.rec >= 100) nice("따뜻한 말이 훨씬 많아요", `최근 90일, 서운한 말 1개당 따뜻한 말이 ${U.num(Math.round(wr))}개꼴이에요.`, "ratio", [sc("warmRec", "최근의 따뜻한 말")]);
       // 6) '너는 맨날' 대신 '나는'
       const absA = ga.absAll, absB = gb.absAll;
       if (absA + absB >= 4) {
         const x = absA >= absB ? A : B, n = Math.max(absA, absB);
         add("mid", "'맨날', '항상' 대신 '나는'으로",
           `'너는 맨날', '항상 그래'처럼 상대 전체를 말하는 표현이 ${x}에게서 ${n}번 나왔어요.`,
-          "서운할 땐 '너는 맨날' 대신 '나는 ~해서 서운했어, ~해 줄래?' 순서로 말해 보세요. 같은 이야기도 훨씬 부드럽게 닿아요.", "soft", "나 오늘 연락이 없어서 좀 서운했어. 바쁘면 한 줄만 남겨 줄래?");
-      } else if (ga.istmtAll + gb.istmtAll >= 3) nice("서운함을 '나는'으로 말해요", `'나는 ~해서 서운했어'처럼 내 마음으로 말한 게 ${U.num(ga.istmtAll + gb.istmtAll)}번이에요.`, "soft");
+          "서운할 땐 '너는 맨날' 대신 '나는 ~해서 서운했어, ~해 줄래?' 순서로 말해 보세요. 같은 이야기도 훨씬 부드럽게 닿아요.", "soft", "나 오늘 연락이 없어서 좀 서운했어. 바쁘면 한 줄만 남겨 줄래?", [sc("abs:" + x, "이런 말이 있었어요"), sc("istmt", "이렇게 말한 날도 있었어요")]);
+      } else if (ga.istmtAll + gb.istmtAll >= 3) nice("서운함을 '나는'으로 말해요", `'나는 ~해서 서운했어'처럼 내 마음으로 말한 게 ${U.num(ga.istmtAll + gb.istmtAll)}번이에요.`, "soft", [sc("istmt", "이렇게 말했어요")]);
       // 7) 서로 알아가는 질문
       const co = (ga.curiousOldPer1000 + gb.curiousOldPer1000) / 2, cr = (ga.curiousRecPer1000 + gb.curiousRecPer1000) / 2;
       if (h.recDays >= 30 && co >= 3 && cr <= co * 0.6) add("low", "서로에게 묻는 질문이 줄었어요",
         `'어땠어?', '무슨 생각 해?'처럼 마음을 묻는 질문이 글 1000개당 ${U.num1(co)}번에서 ${U.num1(cr)}번으로 줄었어요.`,
-        "아래 '오늘의 질문'에서 하나를 골라 보내 보세요. 오래 만나도 아직 모르는 게 꼭 있어요.", "lovemap", "갑자기 궁금해졌어. 요즘 제일 신경 쓰이는 일이 뭐야?");
+        "아래 '오늘의 질문'에서 하나를 골라 보내 보세요. 오래 만나도 아직 모르는 게 꼭 있어요.", "lovemap", "갑자기 궁금해졌어. 요즘 제일 신경 쓰이는 일이 뭐야?", [sc("curiousOld", "예전엔 이렇게 물었어요")]);
     }
     // 8) 사랑의 언어 맞춤
     const ro = w => { const c = w.charCodeAt(w.length - 1) - 0xAC00; if (c < 0 || c > 11171) return "로"; const j = c % 28; return j === 0 || j === 8 ? "로" : "으로"; };
@@ -124,15 +129,16 @@
         const y = other(x), top = L[y].top, mine = L[x].top;
         if (top !== mine && R_LANG[top]) add("low", `${y}에게는 '${name(top)}'${ro(name(top))}`,
           `카톡으로 보면 ${U.eunneun(y)} '${name(top)}'${ro(name(top))} 마음을 가장 많이 표현하고, ${U.eunneun(x)} '${name(mine)}' 쪽이에요. 사람은 흔히 자기가 표현하는 방식으로 사랑받고 싶어 해요.`,
-          `${U.eunneun(x)} 이번 주에 ${y}의 방식으로 한 번 표현해 보세요. ${R_LANG[top].tip}.`, "lang", R_LANG[top].msg);
+          `${U.eunneun(x)} 이번 주에 ${y}의 방식으로 한 번 표현해 보세요. ${R_LANG[top].tip}.`, "lang", R_LANG[top].msg,
+          [(() => { const c = (L[y].cats || []).find(c => c.key === top), e0 = c && c.examples && c.examples[0]; return e0 ? { title: `${U.iga(y)} 이렇게 표현했어요`, date: e0.date, lines: [{ who: y, t: Date.parse(e0.date + "T12:00:00"), text: e0.text }], noTime: true } : null; })()]);
       }
     }
   }
 
   function advice(r) {
     const [A, B] = r.people, s = r.signals, out = [], good = [];
-    const add = (level, title, why, how, sci, tryMsg) => out.push({ level, title, why, how, sci: sci ? SCI[sci] : null, try: tryMsg || null });
-    const nice = (title, why, sci) => good.push({ title, why, sci: sci ? SCI[sci] : null });
+    const add = (level, title, why, how, sci, tryMsg, scenes) => out.push({ level, title, why, how, sci: sci ? SCI[sci] : null, try: tryMsg || null, scenes: (scenes || []).filter(Boolean) });
+    const nice = (title, why, sci, scenes) => good.push({ title, why, sci: sci ? SCI[sci] : null, scenes: (scenes || []).filter(Boolean) });
     const ov = r.overview;
     habitItems(r, add, nice);
 
@@ -152,7 +158,7 @@
     const dPer = ch(rec.perDay, old.perDay);
     if (dPer <= -0.15) add(dPer <= -0.3 ? "high" : "mid", "대화량이 줄었어요",
       `최근 90일 하루 평균 말풍선이 ${U.num1(rec.perDay)}개로, 이전(${U.num1(old.perDay)}개)보다 ${p(-dPer)} 적어요.`,
-      "하루에 한 번, 정해 둔 시간(점심이나 퇴근길)에 '오늘 제일 웃겼던 일' 하나씩 주고받아 보세요. 짧아도 매일 이어지는 대화가 커져요.", "rituals", "오늘 제일 웃겼던 일 하나만 말해 줘ㅋㅋ 나부터 말할게!");
+      "하루에 한 번, 정해 둔 시간(점심이나 퇴근길)에 '오늘 제일 웃겼던 일' 하나씩 주고받아 보세요. 짧아도 매일 이어지는 대화가 커져요.", "rituals", "오늘 제일 웃겼던 일 하나만 말해 줘ㅋㅋ 나부터 말할게!", [r.highlights && r.highlights.peakDay ? Object.assign({ title: "예전엔 이렇게 이야기했어요" }, r.highlights.peakDay) : null]);
 
     // 카톡 통화
     if (old.callsPerMonth >= 2 && rec.callsPerMonth <= old.callsPerMonth * 0.4) add("high", "카톡 통화가 줄었어요",
@@ -194,7 +200,7 @@
       const [x, y] = ap[A] >= ap[B] ? [A, B] : [B, A];
       if (ap[x] >= 8 && ap[x] >= ap[y] * 2.2) add("mid", "먼저 사과하는 사람이 한쪽이에요",
         `갈등이 컸던 ${c.days.length}일 중 먼저 미안하다고 한 건 ${x} ${ap[x]}번, ${y} ${ap[y]}번이에요.`,
-        `다음엔 ${y}도 먼저 '나도 미안해'를 건네 보세요. 누가 먼저냐보다 둘 다 말하는 게 중요해요.`, "repair", "아까는 내가 말이 좀 날카로웠어. 나도 미안해");
+        `다음엔 ${y}도 먼저 '나도 미안해'를 건네 보세요. 누가 먼저냐보다 둘 다 말하는 게 중요해요.`, "repair", "아까는 내가 말이 좀 날카로웠어. 나도 미안해", [c.scenes && c.scenes[0] ? Object.assign({ title: "서운했던 날, 이렇게 풀었어요" }, c.scenes[0]) : null]);
     }
 
     // 서운함 요일

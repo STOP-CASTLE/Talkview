@@ -179,12 +179,22 @@
   const ABS = /(너|넌|니가|네가|너는).{0,12}(맨날|항상|매번|늘)|(맨날|항상|매번)\s?(그래|그러|이래|이러|그런)/;
   const ISTMT = /(나는|난|내가|나).{0,15}(서운했|속상했|섭섭했|외로웠|슬펐|힘들었|서운해|속상해|섭섭해)/;
   const CURIOUS = /왜\s?그렇게|어땠어|어땠는지|어떤\s?(기분|생각)|무슨\s?생각|기분\s?(어때|어땠)|요즘\s?(어때|무슨|고민)|힘든\s?(거|일)\s?있|하고\s?싶은\s?(거|게)|꿈이\s?뭐|어렸을\s?때/;
+  const HARSH_EX = /씨발|시발|ㅅㅂ|병신|ㅂㅅ|존나|좆|개새|닥쳐/;
+  const lineOf = m => ({ who: m.who, t: m.t, text: m.type === "text" ? m.text : m.type === "photo" ? "(사진)" : m.type === "link" ? "(링크)" : m.type === "emoticon" ? "(이모티콘)" : m.type === "call" ? "(통화)" : "(삭제된 메시지)" });
+  const cleanLine = m => m.type !== "text" || (m.text.length <= 70 && !HARSH_EX.test(m.text) && !m.text.includes("\n"));
+  // i번째부터 span 안의 메시지를 n줄까지 → 장면(거친 말·긴 글이 있으면 null)
+  function exScene(ms, i, n, span) {
+    const out = [];
+    for (let j = i; j < ms.length && out.length < n && ms[j].t - ms[i].t <= span; j++) { if (!cleanLine(ms[j])) return null; out.push(lineOf(ms[j])); }
+    return out.length ? { date: U.dayKey(ms[i].t), lines: out } : null;
+  }
   function habits(messages, people) {
     if (!messages.length) return null;
     const [A, B] = people, M = 60000, t1 = messages[messages.length - 1].t, cut = t1 - 90 * U.DAY;
     const WARM = new RegExp([R.LOVE.love, R.LOVE.like, R.LOVE.miss, R.LOVE.cute, R.LOVE.thanks].map(x => x.source).join("|"));
     const z = () => ({ all: 0, rec: 0 });
-    const P = {};
+    const P = {}, EX = {};
+    const keep = (key, sc, extra) => { if (sc) EX[key] = Object.assign(sc, extra || {}); };
     for (const p of people) P[p] = { bids: z(), toward: z(), news: 0, cele: 0, newsAns: 0, thanks: z(), texts: z(), abs: z(), istmt: z(), curious: z(), morning: 0, night: 0 };
     const other = p => p === A ? B : A;
     let warm = z(), conf = z(), oldDays = new Set(), recDays = new Set(), mDays = { all: new Set(), rec: new Set() }, nDays = { all: new Set(), rec: new Set() };
@@ -196,14 +206,14 @@
       if (m.type === "text") {
         const t = m.text;
         q.texts[k]++;
-        if (R.LOVE.thanks.test(t)) q.thanks[k]++;
-        if (ABS.test(t)) q.abs[k]++;
-        if (ISTMT.test(t)) q.istmt[k]++;
-        if (CURIOUS.test(t)) q.curious[k]++;
-        if (WARM.test(t) || /ㅋㅋ|ㅎㅎ/.test(t)) warm[k]++;
+        if (R.LOVE.thanks.test(t)) { q.thanks[k]++; if (t.length >= 8 && t.length <= 45 && /덕분|줘서|주셔서|해줘|챙겨|와줘|사줘|들어줘|기다려/.test(t)) keep("thanks:" + m.who, exScene(messages, i, 1, 0)); }
+        if (ABS.test(t)) { q.abs[k]++; keep("abs:" + m.who, exScene(messages, i, 3, 10 * M)); }
+        if (ISTMT.test(t)) { q.istmt[k]++; keep("istmt", exScene(messages, i, 3, 10 * M)); }
+        if (CURIOUS.test(t)) { q.curious[k]++; if (t.length <= 40) keep(rec ? "curiousRec" : "curiousOld", exScene(messages, i, 3, 20 * M)); }
+        if (WARM.test(t) || /ㅋㅋ|ㅎㅎ/.test(t)) { warm[k]++; if (rec && WARM.test(t) && t.length >= 8 && t.length <= 40) keep("warmRec", exScene(messages, i, 2, 10 * M)); }
         if (R.CONF_MSG.test(t)) conf[k]++;
         if (R.LOVE.goodmorning.test(t)) { q.morning++; (rec ? mDays.rec : mDays.all).add(dk); }
-        if (R.LOVE.goodnight.test(t)) { q.night++; (rec ? nDays.rec : nDays.all).add(dk); }
+        if (R.LOVE.goodnight.test(t)) { q.night++; (rec ? nDays.rec : nDays.all).add(dk); if (!rec && t.length >= 4 && t.length <= 40) keep("nightOld", exScene(messages, i, 3, 10 * M)); }
         // 좋은 소식에 어떻게 반응했나
         if (GOOD.test(t) && !NOT_GOOD.test(t)) {
           let first = -1;
@@ -213,7 +223,7 @@
             q.newsAns++;
             let txt = "";
             for (let j = first; j < messages.length && messages[j].t - messages[first].t <= 10 * M; j++) if (messages[j].who !== m.who && messages[j].type === "text") txt += " " + messages[j].text;
-            if (CELE.test(txt)) q.cele++;
+            if (CELE.test(txt)) { q.cele++; keep("newsGood:" + m.who, exScene(messages, i, 5, 20 * M)); } else keep("newsMiss:" + m.who, exScene(messages, i, 4, 60 * M));
           }
         }
       }
@@ -222,16 +232,21 @@
         const prev = messages[i - 1];
         if (prev && prev.who === m.who && isBid(prev) && m.t - prev.t <= 3 * M) continue;
         q.bids[k]++;
+        let answered = null, ansJ = -1;
         for (let j = i + 1; j < messages.length && messages[j].t - m.t <= 30 * M; j++) {
           const n = messages[j];
           if (n.who === m.who) continue;
-          if ((n.type === "text" && !MIN_REPLY.test(n.text.trim())) || n.type === "photo" || n.type === "call") { q.toward[k]++; }
+          answered = (n.type === "text" && !MIN_REPLY.test(n.text.trim())) || n.type === "photo" || n.type === "call"; ansJ = j;
+          if (answered) q.toward[k]++;
           break;
         }
+        if (answered && ansJ >= 0 && messages[ansJ].type === "text" && messages[ansJ].text.length >= 10) keep("bidGood:" + m.who, exScene(messages, i, Math.min(5, ansJ - i + 2), 30 * M));
+        else if (answered === false) keep("bidMiss:" + m.who, exScene(messages, i, ansJ - i + 1, 30 * M));
+        else if (answered === null && (m.type !== "text" || m.text.length >= 4)) { const sc = exScene(messages, i, 1, 0); keep("bidMiss:" + m.who, sc, sc ? { note: "30분 동안 답이 없었어요" } : null); }
       }
     }
     const sum = o => o.all + o.rec;
-    const out = { people: {}, warm, conf, recDays: recDays.size, oldDays: oldDays.size,
+    const out = { people: {}, ex: EX, warm, conf, recDays: recDays.size, oldDays: oldDays.size,
       morningShare: { old: oldDays.size ? mDays.all.size / oldDays.size : 0, rec: recDays.size ? mDays.rec.size / recDays.size : 0 },
       nightShare: { old: oldDays.size ? nDays.all.size / oldDays.size : 0, rec: recDays.size ? nDays.rec.size / recDays.size : 0 } };
     for (const p of people) {
