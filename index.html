@@ -393,6 +393,28 @@ details.more[open] > summary::after { content: "접기"; }
 details.more[open] { padding-bottom: 16px; background: transparent; padding-left: 0; padding-right: 0; }
 details.more[open] > summary { background: var(--surface); border-radius: var(--r); padding: 16px; }
 
+/* v20: 연구 기반 조언 */
+.item.adv.done { box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 45%, transparent) inset; }
+.trybox { display: grid; gap: 6px; }
+.trybub { justify-self: start; max-width: 92%; background: var(--tint); color: #fff; padding: 9px 13px; border-radius: 18px 18px 18px 6px; font-size: 15px; line-height: 1.45; }
+.copybtn { justify-self: start; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 13px; font-weight: 600; color: var(--tint); background: var(--fill); border: 0; border-radius: 99px; padding: 5px 11px; cursor: pointer; }
+.copybtn svg { width: 14px; height: 14px; }
+details.sci { background: var(--fill); border-radius: 12px; padding: 8px 12px; }
+details.sci summary { font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; list-style: none; }
+details.sci summary::before { content: "📖 "; }
+details.sci p { font-size: 14px; color: var(--fg); margin-top: 6px; line-height: 1.55; }
+.mission { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; padding-top: 2px; }
+.mission input { width: 20px; height: 20px; accent-color: var(--good); }
+.item.done .mission { color: var(--good); font-weight: 600; }
+.qitem p { font-size: 16px; font-weight: 600; }
+.item.fight { gap: 8px; }
+.fx { border-radius: 12px; padding: 9px 12px; display: grid; gap: 3px; }
+.fx .tag { font-size: 12px; font-weight: 700; }
+.fx p { font-size: 15px; }
+.fx.bad { background: color-mix(in srgb, var(--bad) 8%, transparent); } .fx.bad .tag { color: var(--bad); } .fx.bad p { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+.fx.good { background: color-mix(in srgb, var(--good) 10%, transparent); } .fx.good .tag { color: var(--good); }
+#toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); background: rgba(20,20,24,.92); color: #fff; font-size: 14px; padding: 10px 16px; border-radius: 99px; opacity: 0; transition: .25s; z-index: 70; pointer-events: none; white-space: nowrap; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
 /* v19: 단톡방 */
 .gchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .gchips span { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--surface); color: var(--gc, var(--muted)); box-shadow: 0 0 0 1px var(--line) inset; }

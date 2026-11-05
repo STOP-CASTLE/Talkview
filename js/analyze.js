@@ -299,6 +299,7 @@
     r.signals = Extra.signals(messages, people);
     r.routine = Routine.routine(messages, people);
     r.loveLang = loveLang(messages, people);
+    r.habits = Extra.habits(messages, people);
     r.mbti = mbti(r, messages, people);
 
     /* ---------- score ---------- */

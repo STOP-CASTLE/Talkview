@@ -959,6 +959,15 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const roP = w => { const c = w.charCodeAt(w.length - 1) - 0xac00, j = c >= 0 && c < 11172 ? c % 28 : 0; return j && j !== 8 ? "으로" : "로"; };
   const yeoss = w => w + (U.jong(w) ? "이었어요" : "였어요");
 
+  const MKEY = "talkview.missions.v1";
+  function missions() { try { return JSON.parse(localStorage.getItem(MKEY) || "{}") || {}; } catch (_) { return {}; } }
+  function setMission(k, v) { const m = missions(); if (v) m[k] = Date.now(); else delete m[k]; try { localStorage.setItem(MKEY, JSON.stringify(m)); } catch (_) { /* 저장 못 해도 계속 */ } }
+  function toast(msg) { let t = document.getElementById("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); } t.textContent = msg; t.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 1600); }
+  async function copyText(x) {
+    try { await navigator.clipboard.writeText(x); toast("복사했어요. 카톡에 붙여 넣어 보세요"); return; } catch (_) { /* 아래로 */ }
+    const ta = document.createElement("textarea"); ta.value = x; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("복사했어요. 카톡에 붙여 넣어 보세요"); } catch (_) { toast("길게 눌러 직접 복사해 주세요"); } ta.remove();
+  }
   const RENDER = {
     gbond() {
       const g = state.group;
@@ -1125,14 +1134,25 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       return opening + cover + toc + s.chapters.map(c => `<article class="chapter" id="ch-${c.id}"><h2>${e(c.title)}</h2>${c.blocks.map(storyBlock).join("")}</article>`).join("");
     },
     advice() {
-      const a = state.adv, s = state.sum.advice;
+      const a = state.adv, s = state.sum.advice, done = missions();
       let h = read("더 사랑하려면", "최근 90일, 우리는 어땠을까", s);
       if (a.lights.length) h += block("여섯 가지 신호", `<div class="lights">${a.lights.map(l => `<div class="light ${l.color}"><span class="sig">${e(l.label)}</span><span class="num">${l.change > 0 ? "+" : ""}${l.change}%</span></div>`).join("")}</div>`, "최근 90일과 그 이전을 비교했어요. 초록은 괜찮음, 노랑은 조금 줄어듦, 빨강은 많이 줄어듦이에요. 서운함은 늘수록 빨강이에요.");
-      const item = (it, i) => `<div class="item"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)} <span class="pill ${it.level}">${{ high: "먼저", mid: "보통", low: "가볍게" }[it.level]}</span></h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div><div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div></div>`;
-      if (a.top.length) h += block("먼저 해 볼 세 가지", `<div class="items">${a.top.map(item).join("")}</div>`);
+      const tryBox = t => t ? `<div class="trybox"><div class="k">이렇게 보내 보세요</div><div class="trybub">${e(t)}</div><button class="copybtn" type="button" data-copy="${e(t)}">${ico("chat")}복사하기</button></div>` : "";
+      const sci = x => x ? `<details class="sci"><summary>연구에서는</summary><p>${e(x)}</p></details>` : "";
+      const item = (it, i, mission) => {
+        const key = it.title, on = !!done[key];
+        return `<div class="item adv${on ? " done" : ""}"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)} <span class="pill ${it.level}">${{ high: "먼저", mid: "보통", low: "가볍게" }[it.level]}</span></h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div><div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div>${tryBox(it.try)}${sci(it.sci)}${mission ? `<label class="mission"><input type="checkbox" data-mission="${e(key)}"${on ? " checked" : ""}><span>${on ? "해 봤어요! 잘했어요" : "이번 주에 해 보면 체크해 두세요"}</span></label>` : ""}</div>`;
+      };
+      if (a.top.length) h += block("이번 주에 해 볼 세 가지", `<div class="items">${a.top.map((it, i) => item(it, i, true)).join("")}</div>`, "체크는 이 기기에만 남아요.");
       if (a.items.length > 3) h += block("그 밖에 살펴볼 것", `<div class="items">${a.items.slice(3).map(it => item(it)).join("")}</div>`);
-      if (a.good.length) h += block("잘하고 있어요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">잘함</span></h4><p>${e(g.why)}</p></div>`).join("")}</div>`);
-      h += block("늘 도움이 되는 것", `<div class="items">${a.general.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill gen">일반적인 조언</span></h4><p>${e(g.how)}</p></div>`).join("")}</div>`);
+      if (a.good.length) h += block("잘하고 있어요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">잘함</span></h4><p>${e(g.why)}</p>${sci(g.sci)}</div>`).join("")}</div>`);
+      if (a.questions) {
+        const day = Math.floor(Date.now() / 864e5), qs = [0, 7, 13].map(k => a.questions[(day + k) % a.questions.length]);
+        h += block("오늘의 질문", `<div class="items">${qs.map(q => `<div class="item qitem"><p>${e(q)}</p><button class="copybtn" type="button" data-copy="${e(q)}">${ico("chat")}복사하기</button></div>`).join("")}</div>`, "서로를 더 알아 가는 질문이에요. 매일 바뀌어요. 오래 만나도 아직 모르는 게 꼭 있어요.");
+      }
+      if (a.fight) h += block("다툴 때 기억할 네 가지", `<div class="items">${a.fight.map(f => `<div class="item fight"><div class="fx bad"><span class="tag">이렇게 말고 · ${e(f.bad)}</span><p>"${e(f.badEx)}"</p></div><div class="fx good"><span class="tag">이렇게 · ${e(f.good)}</span><p>"${e(f.goodEx)}"</p></div></div>`).join("")}</div>`, "가트맨 연구소가 관계를 무너뜨리는 말버릇으로 꼽은 '네 가지 독'과, 그 대신 쓰면 좋은 말이에요.");
+      h += block("오래 사랑하는 커플의 습관", `<div class="items">${a.general.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill gen">${g.sci ? "연구로 본 습관" : "일반적인 조언"}</span></h4><p>${e(g.how)}</p>${sci(g.sci)}</div>`).join("")}</div>`);
+      h += `<p class="foot">참고한 연구: 존 가트맨·줄리 가트맨(가트맨 연구소)의 부부 관찰 연구, 셸리 게이블 외(2006) 좋은 소식에 반응하기, 사라 알고 외(2010) 고마움 연구, 아서 아론 외(2000) 새로운 활동 연구, 게리 채프먼 『5가지 사랑의 언어』. 카톡 말을 세어 연구 개념에 맞춰 본 근사치라, 연구와 같은 방법으로 잰 숫자는 아니에요.</p>`;
       return h + concl(s);
     },
     freq() {
@@ -1240,7 +1260,16 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   }
 
   /* ---------- 이벤트 ---------- */
+  document.addEventListener("change", ev => {
+    const m = ev.target.closest && ev.target.closest("[data-mission]");
+    if (!m) return;
+    setMission(m.dataset.mission, m.checked);
+    const box = m.closest(".item"); if (box) box.classList.toggle("done", m.checked);
+    const sp = m.parentNode.querySelector("span"); if (sp) sp.textContent = m.checked ? "해 봤어요! 잘했어요" : "이번 주에 해 보면 체크해 두세요";
+  });
   document.addEventListener("click", ev => {
+    const cp = ev.target.closest("[data-copy]");
+    if (cp) { copyText(cp.dataset.copy); return; }
     const t = ev.target.closest("[data-go],[data-act],[data-jump],[data-guide],[data-rel],[data-me],a[data-nav]");
     if (!t) return;
     if (t.dataset.rel !== undefined) { rel = t.dataset.rel || null; render(); return; }
@@ -1338,6 +1367,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   // 시작: 이 기기에 저장된 결과가 있으면 홈, 없으면 시작 화면
   state = load();
   if (state && !state.r) state = null;
+  if (state && state.r && window.Advice) { try { state.adv = Advice.advice(state.r); state.sum = Summary.summary(state.r, state.adv); } catch (_) { /* 예전 결과 그대로 */ } }
   if (state && state.group && window.Group) { try { state.gstory = Group.story(state.group, state.info || {}); } catch (_) { state.group = null; } }
   if (state && state.rel === "friend" && window.Friend) { try { state.friend = Friend.make(state.r, { since: state.info && state.info.since, me: state.info && state.info.me }); } catch (_) { state = null; } }
   if (state && state.rel === "crush" && state.info && state.info.me && window.Crush) { try { state.crush = Crush.make(state.r, state.info.me, { likeSince: state.info.since }); } catch (_) { state.crush = null; } }

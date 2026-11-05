@@ -169,5 +169,86 @@
     return { span, comparable: span >= 150, rec: window(messages, people, cut, t1), old: span >= 150 ? window(messages, people, t0, cut) : null };
   }
 
-  return { balance, life, signals, isQ };
+
+  /* v20 연구 기반 조언용 습관 지표 (가트맨·게이블·알고 연구를 카톡 말로 옮겨 센 근사치) */
+  const MIN_REPLY = /^(ㅇㅇ|ㅇㅋ|응+|웅+|어+|엉+|ㅇ|ok|오키|넹|넵|네|그래|ㄱㄱ|ㅋ+|ㅎ+|ㅇㅎ|아하|그렇구나|그렇군)[\s.!~ㅋㅎ]*$/i;
+  const BID_TEXT = /이거\s?봐|봐\s?봐|들어\s?봐|있잖아|나 오늘|오늘 .{0,10}(있었|봤는데|했는데)|대박|헐+/;
+  const GOOD = /합격|붙었|승진|통과했|성공했|칭찬\s?받|뽑혔|당첨|이겼|1등|보너스|좋은\s?소식|기쁜\s?소식|해냈|됐다!|됐어!|끝났다!/;
+  const NOT_GOOD = /안\s?(붙|됐)|떨어|못\s?(했|붙)|불합격|\?/;
+  const CELE = /축하|대박|최고|잘했|우와|와+[!~ㅏ]|오오+|멋지|멋있|짱|자랑스|역시|고생했|수고했|!{2,}|진짜\?|ㄷㄷ|미쳤/;
+  const ABS = /(너|넌|니가|네가|너는).{0,12}(맨날|항상|매번|늘)|(맨날|항상|매번)\s?(그래|그러|이래|이러|그런)/;
+  const ISTMT = /(나는|난|내가|나).{0,15}(서운했|속상했|섭섭했|외로웠|슬펐|힘들었|서운해|속상해|섭섭해)/;
+  const CURIOUS = /왜\s?그렇게|어땠어|어땠는지|어떤\s?(기분|생각)|무슨\s?생각|기분\s?(어때|어땠)|요즘\s?(어때|무슨|고민)|힘든\s?(거|일)\s?있|하고\s?싶은\s?(거|게)|꿈이\s?뭐|어렸을\s?때/;
+  function habits(messages, people) {
+    if (!messages.length) return null;
+    const [A, B] = people, M = 60000, t1 = messages[messages.length - 1].t, cut = t1 - 90 * U.DAY;
+    const WARM = new RegExp([R.LOVE.love, R.LOVE.like, R.LOVE.miss, R.LOVE.cute, R.LOVE.thanks].map(x => x.source).join("|"));
+    const z = () => ({ all: 0, rec: 0 });
+    const P = {};
+    for (const p of people) P[p] = { bids: z(), toward: z(), news: 0, cele: 0, newsAns: 0, thanks: z(), texts: z(), abs: z(), istmt: z(), curious: z(), morning: 0, night: 0 };
+    const other = p => p === A ? B : A;
+    let warm = z(), conf = z(), oldDays = new Set(), recDays = new Set(), mDays = { all: new Set(), rec: new Set() }, nDays = { all: new Set(), rec: new Set() };
+    const isBid = m => m.type === "photo" || m.type === "link" || (m.type === "text" && BID_TEXT.test(m.text));
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i], q = P[m.who]; if (!q) continue;
+      const rec = m.t >= cut, k = rec ? "rec" : "all", dk = U.dayKey(m.t);
+      (rec ? recDays : oldDays).add(dk);
+      if (m.type === "text") {
+        const t = m.text;
+        q.texts[k]++;
+        if (R.LOVE.thanks.test(t)) q.thanks[k]++;
+        if (ABS.test(t)) q.abs[k]++;
+        if (ISTMT.test(t)) q.istmt[k]++;
+        if (CURIOUS.test(t)) q.curious[k]++;
+        if (WARM.test(t) || /ㅋㅋ|ㅎㅎ/.test(t)) warm[k]++;
+        if (R.CONF_MSG.test(t)) conf[k]++;
+        if (R.LOVE.goodmorning.test(t)) { q.morning++; (rec ? mDays.rec : mDays.all).add(dk); }
+        if (R.LOVE.goodnight.test(t)) { q.night++; (rec ? nDays.rec : nDays.all).add(dk); }
+        // 좋은 소식에 어떻게 반응했나
+        if (GOOD.test(t) && !NOT_GOOD.test(t)) {
+          let first = -1;
+          for (let j = i + 1; j < messages.length && messages[j].t - m.t <= 60 * M; j++) if (messages[j].who !== m.who) { first = j; break; }
+          q.news++;
+          if (first >= 0) {
+            q.newsAns++;
+            let txt = "";
+            for (let j = first; j < messages.length && messages[j].t - messages[first].t <= 10 * M; j++) if (messages[j].who !== m.who && messages[j].type === "text") txt += " " + messages[j].text;
+            if (CELE.test(txt)) q.cele++;
+          }
+        }
+      }
+      // 관심의 신호(사진·링크·이야기 꺼내기)에 30분 안에 제대로 답했나
+      if (isBid(m)) {
+        const prev = messages[i - 1];
+        if (prev && prev.who === m.who && isBid(prev) && m.t - prev.t <= 3 * M) continue;
+        q.bids[k]++;
+        for (let j = i + 1; j < messages.length && messages[j].t - m.t <= 30 * M; j++) {
+          const n = messages[j];
+          if (n.who === m.who) continue;
+          if ((n.type === "text" && !MIN_REPLY.test(n.text.trim())) || n.type === "photo" || n.type === "call") { q.toward[k]++; }
+          break;
+        }
+      }
+    }
+    const sum = o => o.all + o.rec;
+    const out = { people: {}, warm, conf, recDays: recDays.size, oldDays: oldDays.size,
+      morningShare: { old: oldDays.size ? mDays.all.size / oldDays.size : 0, rec: recDays.size ? mDays.rec.size / recDays.size : 0 },
+      nightShare: { old: oldDays.size ? nDays.all.size / oldDays.size : 0, rec: recDays.size ? nDays.rec.size / recDays.size : 0 } };
+    for (const p of people) {
+      const q = P[p], o = P[other(p)];
+      out.people[p] = {
+        // p가 보낸 신호에 상대가 답한 비율
+        bidsSent: sum(q.bids), towardGot: sum(q.toward), towardRateGot: sum(q.bids) ? sum(q.toward) / sum(q.bids) : null,
+        towardRateGotRec: q.bids.rec >= 10 ? q.toward.rec / q.bids.rec : null,
+        news: q.news, newsAns: q.newsAns, newsCele: q.cele,
+        thanksPer1000: sum(q.texts) ? sum(q.thanks) / sum(q.texts) * 1000 : 0, thanksRecPer1000: q.texts.rec ? q.thanks.rec / q.texts.rec * 1000 : 0, thanksOldPer1000: q.texts.all ? q.thanks.all / q.texts.all * 1000 : 0,
+        absRec: q.abs.rec, absAll: sum(q.abs), istmtAll: sum(q.istmt), istmtRec: q.istmt.rec,
+        curiousRecPer1000: q.texts.rec ? q.curious.rec / q.texts.rec * 1000 : 0, curiousOldPer1000: q.texts.all ? q.curious.all / q.texts.all * 1000 : 0,
+        morning: q.morning, night: q.night
+      };
+    }
+    return out;
+  }
+
+  return { balance, life, signals, isQ, habits };
 });
