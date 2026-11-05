@@ -81,12 +81,19 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   async function readFiles(list) {
     const out = [];
     for (const f of list) {
-      if (f.size > MAX) throw new Error(`${f.name} 파일이 120MB가 넘어서 읽을 수 없어요.`);
-      if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) {
+      const isZip = /\.zip$/i.test(f.name) || /zip/.test(f.type);
+      // 큰 zip(사진·동영상 포함)도 txt만 골라 읽는다 — 크기 제한 없음 (v14, bigzip.js)
+      if (isZip && window.BigZip && BigZip.supported()) {
+        try { out.push(...await BigZip.readTexts(f)); continue; }
+        catch (err) { if (f.size > MAX) throw new Error(`${f.name}을 열지 못했어요. ${err.message || ""}`); /* 작으면 JSZip으로 다시 시도 */ }
+      }
+      if (f.size > MAX) throw new Error(isZip ? `${f.name} 파일이 너무 커서 이 기기에서 열 수 없어요. 카톡에서 '텍스트 메시지만 보내기'로 다시 내보내 주세요.` : `${f.name} 파일이 120MB가 넘어서 읽을 수 없어요.`);
+      if (isZip) {
         if (!window.JSZip) throw new Error("zip을 여는 도구를 불러오지 못했어요. 압축을 풀어 txt 파일로 올려 주세요.");
         const z = await JSZip.loadAsync(f);
         const names = Object.keys(z.files).filter(n => /\.txt$/i.test(n) && !z.files[n].dir);
         for (const n of names) out.push({ name: n, text: await z.files[n].async("string") });
+        continue;
       } else out.push({ name: f.name, text: await f.text() });
     }
     if (!out.length) throw new Error("txt 파일을 찾지 못했어요.");
@@ -194,7 +201,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   let rel = null;
   const STEPS = {
     phone: IOS
-      ? [["카카오톡에서 분석할 1:1 채팅방을 열어요.", ""], ["오른쪽 위 메뉴(≡) → 설정(톱니바퀴)을 눌러요.", ""], ["<b>대화 내용 내보내기</b> → <b>모든 메시지 도큐먼트로 저장</b>을 눌러요.", "'텍스트 메시지만 보내기'를 누르면 메일 쓰기 화면이 떠요. 꼭 '도큐먼트로 저장'을 골라 주세요. 누르면 아이폰에 자동으로 저장돼요."], ["TALK VIEW로 돌아와 <b>카톡 대화 불러오기</b>를 눌러요.", "파일 창 아래 '최근 항목'(또는 '탐색' → '나의 iPhone' → KakaoTalk)에서 방금 저장된 파일을 누르면 바로 분석돼요."]]
+      ? [["카카오톡에서 분석할 1:1 채팅방을 열어요.", ""], ["오른쪽 위 메뉴(≡) → 설정(톱니바퀴)을 눌러요.", ""], ["<b>대화 내용 내보내기</b> → <b>텍스트 메시지만 보내기</b>를 눌러요.", "공유 창이 뜨면 메일 말고 <b>'파일에 저장'</b>을 골라요. 사진까지 담는 '모든 메시지' 저장은 파일이 너무 커질 수 있어요."], ["TALK VIEW로 돌아와 <b>카톡 대화 불러오기</b>를 눌러요.", "파일 창의 '최근 항목'에서 방금 저장한 파일을 누르면 바로 분석돼요."]]
       : [["카카오톡에서 분석할 1:1 채팅방을 열어요.", ""], ["오른쪽 위 메뉴(≡) → 설정(톱니바퀴)을 눌러요.", ""], ["대화 내용 내보내기 → 텍스트 메시지만 보내기", IN_APP ? "공유 목록에서 TALK VIEW를 누르면 끝이에요." : "파일로 저장한 뒤 위 버튼으로 골라요."]],
     pc: [["PC 카카오톡에서 채팅방을 열어요.", ""], ["메뉴(≡) → 대화 내용 → 대화 내보내기", "Ctrl+S로도 저장할 수 있어요."], ["저장된 txt 파일을 위 버튼으로 고르거나 화면에 끌어다 놓아요.", ""]]
   };
