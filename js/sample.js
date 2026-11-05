@@ -84,5 +84,47 @@
     }
     return lines.join("\n");
   }
-  return { make };
+
+  /* 짝사랑 샘플(v17) — 가상의 두 사람: 박서윤(나), 최도현(그 사람). 4개월, 존댓말→반말,
+     처음엔 서윤이 주로 먼저 연락하다가 갈수록 도현도 먼저 연락하고 답장도 빨라지는 흐름. */
+  function makeCrush() {
+    const R = rng(20260601), pick = a => a[Math.floor(R() * a.length)], chance = p => R() < p;
+    const ME = "박서윤", TH = "최도현";
+    const lines = ["최도현 님과 카카오톡 대화", "저장한 날짜 : 2026. 11. 1. 오후 11:00", ""];
+    const start = new Date(2026, 5, 2), end = new Date(2026, 9, 31);
+    const fmt = (d, who, text) => `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${d.getHours() < 12 ? "오전" : "오후"} ${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${String(d.getMinutes()).padStart(2, "0")}, ${who} : ${text}`;
+    let n = 0;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), n++) {
+      const prog = n / 150; // 0 → 1
+      if (!chance(0.45 + prog * 0.4)) continue;
+      const formal = n < 18;
+      let t = new Date(d); t.setHours(12 + Math.floor(R() * 10), Math.floor(R() * 60), 0, 0);
+      const out = [];
+      const say = (who, text, gap) => { t = new Date(t.getTime() + (gap == null ? 1 + Math.floor(R() * 4) : gap) * 60000); out.push(fmt(t, who, text)); };
+      const thFirst = chance(0.12 + prog * 0.35), a = thFirst ? TH : ME, b = thFirst ? ME : TH;
+      const thGap = () => Math.max(0, Math.round((1 - prog) * (3 + R() * 25) + R() * 4));
+      const open = formal ? ["안녕하세요!", "오늘 수업 어떠셨어요?", "혹시 과제 끝내셨어요?", "주말 잘 보내셨어요?"] : ["뭐 해?", "오늘 뭐 했어?", "이거 봤어? ㅋㅋ", "점심 뭐 먹었어?", "퇴근했어?", "오늘 날씨 진짜 좋다"];
+      say(a, pick(open), 0);
+      say(b, pick(formal ? ["네 안녕하세요 ㅎㅎ", "저 방금 끝났어요", "아직이요 ㅠㅠ"] : ["방금 끝났어 ㅎㅎ", "ㅋㅋㅋ 봤어", "나 김치찌개!", "응 이제 집 가는 중"]), b === TH ? thGap() : null);
+      const k = 3 + Math.floor(R() * (6 + prog * 14));
+      for (let i = 0; i < k; i++) {
+        const who = chance(0.58 - prog * 0.08) ? ME : TH;
+        const pool = formal
+          ? ["그 영화 보셨어요?", "저도 그거 좋아해요 ㅎㅎ", "오늘 날씨 좋네요", "주말에 뭐 하세요?", "아 진짜요? ㅋㅋ", "고마워요!", "재밌었어요 ㅎㅎ"]
+          : who === ME
+            ? ["ㅋㅋㅋㅋ", "진짜?", "오늘 좀 피곤해", "그거 나도 좋아해!", "다음에 같이 가 볼래?", "주말에 뭐 해?", "고마워 ㅎㅎ", "너는 요즘 뭐가 제일 재밌어?", "헐 대박", "그 노래 계속 듣고 있어", "잘 자!"]
+            : (prog > 0.5
+              ? ["ㅋㅋㅋ 너 진짜 웃기다", "너는 오늘 어땠어?", "주말에 영화 볼래?", "그 카페 가 봤어?", "ㅋㅋㅋㅋ", "응응", "오늘 좀 바빴어", "그치", "내일 시간 돼?", "잘 자", "너는 뭐 좋아해?", "오 좋다", "피곤하다 ㅠ", "고마워"]
+              : ["ㅋㅋㅋ", "그치", "응응", "오 진짜?", "나도 그거 봤어", "피곤하다", "ㅇㅇ", "ㅋㅋ 그러게", "바빠서 이제 봤어"]);
+        say(who, pick(pool), who === TH ? thGap() : null);
+        if (chance(0.06)) say(who, "이모티콘", 1);
+      }
+      if (chance(0.04 + prog * 0.06)) say(pick([ME, TH]), `보이스톡 ${String(5 + Math.floor(R() * 40)).padStart(2, "0")}:${String(Math.floor(R() * 60)).padStart(2, "0")}`, 20);
+      if (n === 95) { say(TH, "이번 주 토요일에 시간 돼? 같이 전시 보러 갈래?", 0); say(ME, "좋아!! 몇 시?"); say(TH, "2시 어때"); }
+      lines.push(...out);
+    }
+    return lines.join("\n");
+  }
+
+  return { make, makeCrush };
 });

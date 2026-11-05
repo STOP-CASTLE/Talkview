@@ -65,12 +65,13 @@
     /* ---------- speed ---------- */
     const reply = {}; for (const p of people) reply[p] = [];
     const init = zero(people), enders = zero(people), doubles = zero(people);
+    const openers = {}; // v17: 사람별 '조용한 뒤 먼저 건넨 첫마디'(짝사랑 이야기용)
     const sessions = []; let sess = { start: 0, n: 0 };
     let longestSilence = { hours: 0 };
     const monthlyReplyRaw = {};
     for (let i = 0; i < N; i++) {
       const m = messages[i], prev = messages[i - 1], gap = prev ? m.t - prev.t : Infinity;
-      if (gap > R.GAP_INIT) init[m.who]++;
+      if (gap > R.GAP_INIT) { init[m.who]++; if (m.type === "text" && m.text.length >= 2 && m.text.length <= 30) (openers[m.who] = openers[m.who] || []).push({ text: m.text, date: U.dayKey(m.t) }); }
       if (gap > R.GAP_SESSION) { if (prev) { sessions.push(sess); enders[prev.who]++; } sess = { start: i, n: 0 }; }
       sess.n++;
       if (prev && gap > longestSilence.hours * H) longestSilence = { hours: gap / H, from: U.dayKey(prev.t), to: U.dayKey(m.t), breaker: m.who };
@@ -87,6 +88,7 @@
       rs[p] = { n: a.length, mean: U.mean(a), median: U.median(a), in1: a.length ? a.filter(x => x <= 1).length / a.length : 0, in5: a.length ? a.filter(x => x <= 5).length / a.length : 0, in30: a.length ? a.filter(x => x <= 30).length / a.length : 0 };
     }
     const maxS = sessions.reduce((a, b) => b.n > a.n ? b : a, sessions[0]);
+    r.openers = Object.fromEntries(people.map(p => [p, (openers[p] || []).slice(-5)]));
     r.speed = {
       reply: rs, init, enders, doubles, sessions: sessions.length, avgSessionLen: N / sessions.length,
       maxSession: { n: maxS.n, date: U.dayKey(messages[maxS.start].t), start: maxS.start, minutes: Math.round((messages[maxS.start + maxS.n - 1].t - messages[maxS.start].t) / MIN) },

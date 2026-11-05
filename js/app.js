@@ -43,8 +43,15 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     freq: ["대화 빈도", "chat", "우리 얼마나 자주 이야기할까?"], speed: ["답장 속도", "bolt", "누가 더 빨리 답할까?"],
     love: ["애정 표현", "heart", "누가 더 사랑한다고 말할까?"], lang: ["사랑의 언어", "gift", "우리는 어떤 방식으로 사랑할까?"], routine: ["하루 루틴", "moon", "우리는 언제 자고 일어날까?"],
     balance: ["관계의 균형", "scale", "누가 더 챙겨 줄까?"], life: ["일상 이야기", "cup", "우리는 무슨 이야기를 할까?"],
-    mbti: ["MBTI", "people", "우리는 어떤 사람일까?"], conflict: ["싸움과 화해", "cloud", "싸우면 어떻게 화해할까?"]
+    mbti: ["MBTI", "people", "우리는 어떤 사람일까?"], conflict: ["싸움과 화해", "cloud", "싸우면 어떻게 화해할까?"],
+    // 짝사랑(v17)
+    sig: ["호감 신호", "heart", "그 사람도 나에게 관심이 있을까?"], first: ["먼저 다가가기", "chat", "누가 먼저 다가갈까?"],
+    reply: ["답장", "bolt", "답장은 얼마나 빨리 올까?"], curious: ["궁금함", "people", "그 사람도 나를 궁금해할까?"],
+    heart: ["마음 표현", "gift", "마음은 얼마나 드러날까?"], trend: ["요즘 흐름", "sparkle", "요즘 우리는 가까워지고 있을까?"]
   };
+  const CR_IDS = ["sig", "first", "reply", "curious", "heart", "trend"];
+  const CRUSH = () => !!(state && state.rel === "crush");
+  const topTitle = t => CRUSH() && t === "story" ? "마음 이야기" : CRUSH() && t === "advice" ? "다가가려면" : TOP[t];
   const TOP = { home: "홈", story: "사랑 이야기", analysis: "분석", advice: "더 사랑하려면", info: "우리 정보", safe: "안전한 이유" };
   const NAV = [["home", "홈", "home"], ["story", "이야기", "book"], ["analysis", "분석", "grid"], ["advice", "조언", "sparkle"]];
   let state = null, route = "home", depth = 0, lastRoute = null;
@@ -56,7 +63,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const d = ANONYMIZE ? Anon.anonymize(parsed, { keepCouple: SHOW_NAMES }) : parsed;
     const r = Analyze.analyze(d.messages, d.people);
     const adv = Advice.advice(r);
-    return { r, adv, sum: Summary.summary(r, adv), story: Story.story(r), isSample, others: parsed.others, savedAt: Date.now(), info: null, couple: null };
+    return { r, adv, sum: Summary.summary(r, adv), story: Story.story(r), isSample, others: parsed.others, savedAt: Date.now(), info: null, couple: null, rel: rel === "crush" ? "crush" : "love", crush: null };
   }
   // 사용자가 알려 준 정보(사귄 날·MBTI)를 반영해 다시 계산 (v10)
   // 두 사람 이름 바꾸기 (v16): 결과 객체 안의 이름 키·값을 통째로 바꾸고 조언·요약을 다시 만든다.
@@ -75,6 +82,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const cleanName = n => { const c = String(n).replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim(); return c && c !== n ? c : n; };
   function applyInfo(info) {
     state.info = info;
+    if (CRUSH()) { state.crush = Crush.make(state.r, info.me, { likeSince: info.since }); save(); return; }
     state.couple = Couple.make(state.r, info);
     state.story = Story.story(state.r, state.couple);
     save();
@@ -144,7 +152,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   async function sample() {
     loading(true, "샘플 대화를 불러오고 있어요");
     await new Promise(r => setTimeout(r, 60));
-    state = compute([{ name: "sample.txt", text: Sample.make() }], true);
+    state = compute([{ name: "sample.txt", text: rel === "crush" ? Sample.makeCrush() : Sample.make() }], true);
     loading(false); go("info", true);
   }
 
@@ -164,8 +172,10 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const h = location.hash.slice(1);
     route = (h in TOP || h in DETAIL) ? h : "home";
     if (!state && route !== "safe") route = "home";
+    if (state && route in DETAIL && CRUSH() !== CR_IDS.includes(route)) route = "analysis"; // 연인/짝사랑 화면 섞이지 않게
+    if (state && CRUSH() && !state.crush && route !== "info" && route !== "safe") route = "info"; // 짝사랑은 '나'부터
     const inDetail = route in DETAIL;
-    const title = !state ? "" : inDetail ? DETAIL[route][0] : TOP[route];
+    const title = !state ? "" : inDetail ? DETAIL[route][0] : topTitle(route);
     $("#appbar").classList.toggle("solid", inDetail);
     $("#bar").innerHTML = route === "safe" ? `<button class="backbtn" type="button" data-act="back">${ico("back")}돌아가기</button><span class="mini">${e(title)}</span><span></span>` : route === "info" ? `<span></span><span class="mini">${e(title)}</span><span></span>` : (inDetail ? `<button class="backbtn" type="button" data-act="back">${ico("back")}분석</button>` : `<span></span>`)
       + `<span class="mini">${e(title)}</span><span></span>`;
@@ -180,14 +190,16 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (route === "safe") html = safePage();
     else if (!state) html = landing();
     else if (route === "info") html = infoForm();
+    else if (route === "home" && CRUSH()) html = `<header><p class="hello-name">${U.fmtDate(state.r.overview.first)}부터 이어진</p><h1 class="large">${e(state.crush.me)}의 마음,<br><span style="color:var(--accent)">${e(state.crush.them)}</span>에게</h1></header>` + homeCrush();
     else if (route === "home") html = `<header><p class="hello-name">${state.couple && state.couple.since ? `${U.fmtDate(state.couple.since.month)}에 연인이 된` : `${U.fmtDate(state.r.overview.first)}부터 함께한`}</p><h1 class="large">${e(state.r.A)} <span style="color:var(--accent)">♥</span> ${e(state.r.B)}</h1></header>` + home();
-    else if (route === "analysis") html = largeTitle("분석", "궁금한 질문을 눌러 자세히 볼 수 있어요") + analysisList();
+    else if (route === "analysis") html = largeTitle("분석", "궁금한 질문을 눌러 자세히 볼 수 있어요") + (CRUSH() ? crushList() : analysisList());
     else if (route === "story") html = `<div class="panel">${RENDER.story()}</div>`;
-    else if (route === "advice") html = largeTitle("더 사랑하려면") + `<div class="panel">${RENDER.advice()}</div>`;
+    else if (route === "advice") html = largeTitle(topTitle("advice")) + `<div class="panel">${CRUSH() ? RENDER.crushAdvice() : RENDER.advice()}</div>`;
     else {
-      const cd = cards().find(x => x[0] === route);
+      const cd = (CRUSH() ? crushCards() : cards()).find(x => x[0] === route);
       CAP = {}; const body = RENDER[route](); const cap = CAP; CAP = null;
       const ins = (INSIGHTS[route] ? INSIGHTS[route]() : []).filter(Boolean);
+      if (CRUSH()) ins.forEach(x => { if (x.versus && x.focus == null) x.focus = 1; }); // 짝사랑: 늘 '그 사람'(또는 '최근') 쪽을 진하게
       html = `<section class="answer" style="background:var(--p-${route})"><span class="q" style="color:var(--c-${route})">${DETAIL[route][2]}</span><b>${e(cd[1])}</b>${cd[2] ? `<span>${e(cd[2])}</span>` : ""}</section>
         <div class="panel">${cap.read || ""}
           ${ins.length ? `<section class="insights">${ins.map(x => insightCard(x, route)).join("")}</section>` : ""}
@@ -291,11 +303,11 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (!rel) {
       return `<section class="welcome" style="gap:24px">${brand()}
         <p class="pick-q">누구와 나눈 대화인가요?</p>
-        <div class="picks">${RELS.map(([id, label, icon, c, pc, d]) => `<button class="pick" type="button" data-rel="${id}"><span class="badge" style="background:var(${pc});color:var(${c})">${ico(icon)}</span><b>${label}${id === "love" ? "" : ` <span class="soon">준비 중</span>`}</b><span>${d}</span></button>`).join("")}</div>
+        <div class="picks">${RELS.map(([id, label, icon, c, pc, d]) => `<button class="pick" type="button" data-rel="${id}"><span class="badge" style="background:var(${pc});color:var(${c})">${ico(icon)}</span><b>${label}${id === "love" || id === "crush" ? "" : ` <span class="soon">준비 중</span>`}</b><span>${d}</span></button>`).join("")}</div>
         ${trustCard()}
       </section>${installHint()}`;
     }
-    if (rel !== "love") {
+    if (rel !== "love" && rel !== "crush") {
       const r = RELS.find(x => x[0] === rel);
       return `<section class="welcome">${brand()}
         <div class="group soon-box"><span class="badge" style="width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(${r[4]});color:var(${r[3]})">${ico(r[2])}</span>
@@ -305,9 +317,10 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
           <button class="chip-back" type="button" data-rel="">관계 다시 고르기</button></div></section>`;
     }
     return `<section class="welcome" style="gap:22px">${brand()}
+      ${rel === "crush" ? `<p class="pick-q" style="font-size:19px;line-height:1.5">그 사람과 나눈 카톡으로<br>마음이 얼마나 닿았는지 볼게요</p>` : ""}
       <div class="cta"><label class="btn primary block" for="file">카톡 대화 불러오기</label>
         <button class="btn plain" type="button" data-act="sample">샘플로 먼저 둘러보기</button>
-        <button class="chip-back" type="button" data-rel="" style="margin-top:4px">연인 · 관계 다시 고르기</button></div>
+        <button class="chip-back" type="button" data-rel="" style="margin-top:4px">${rel === "crush" ? "짝사랑" : "연인"} · 관계 다시 고르기</button></div>
       ${trustCard(true)}
       <p class="status" id="status" role="status" aria-live="polite">${MOBILE ? "" : "파일을 이 화면에 끌어다 놓아도 돼요."}</p>
     </section>
@@ -327,13 +340,27 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (!infoDraft) {
       infoDraft = state.info ? JSON.parse(JSON.stringify(state.info)) : { since: "", me: null, mbti: {} };
       infoDraft.names = [A(), B()].map(n => state.info ? n : cleanName(n));
-      if (!state.info && state.isSample) infoDraft = { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" }, names: [A(), B()] };
+      if (!state.info && state.isSample) infoDraft = CRUSH() ? { since: "", me: A(), mbti: {}, names: [A(), B()] } : { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" }, names: [A(), B()] };
     }
     const d = infoDraft;
     const opt = p => `<select data-mbti="${e(p)}" aria-label="${e(p)}의 MBTI"><option value="">모르겠어요</option>${Couple.TYPES.map(t => `<option${d.mbti[p] === t ? " selected" : ""}>${t}</option>`).join("")}</select>`;
     const tag = p => d.me ? (d.me === p ? "나" : "상대") : "";
     const thisY = new Date().getFullYear(), yrs = []; for (let y = thisY; y >= +ov.first.slice(0, 4) - 10; y--) yrs.push(y);
     const sy = d.since ? +d.since.slice(0, 4) : null, sm = d.since ? +d.since.slice(5, 7) : null;
+    const ymSel = `<div class="ym"><select id="since-y" aria-label="해"><option value="">연도</option>${yrs.map(y => `<option${sy === y ? " selected" : ""}>${y}</option>`).join("")}</select><select id="since-m" aria-label="달"><option value="">월</option>${Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2, "0")}"${sm === m ? " selected" : ""}>${m}월</option>`).join("")}</select></div>`;
+    const nameField = `<div class="field"><b>이렇게 불러도 될까요?</b>${[0, 1].map(i => { const cur = [A(), B()][i], orig = (state.origNames || [A(), B()])[i]; return `<div class="mrow"><span class="nm" style="font-size:14px;font-weight:600;color:var(--muted)">카톡 이름<small style="font-size:13px;color:var(--fg);word-break:break-all">${e(orig)}</small></span><input type="text" data-rename="${i}" value="${e(d.names[i])}" maxlength="12" placeholder="${e(cur)}" aria-label="${e(orig)}을 부를 이름" autocomplete="off"></div>`; }).join("")}<small>카톡에 애칭이나 이모티콘으로 저장돼 있으면 글이 어색할 수 있어요. 이야기에 쓸 이름으로 바꿔 주세요.${[A(), B()].some(n => cleanName(n) !== n) ? " 기호는 미리 빼 두었어요." : ""}</small></div>`;
+    if (CRUSH()) {
+      return `<header><h1 class="large" style="font-size:28px">두 사람에 대해<br>조금만 알려 주세요</h1><p class="large-sub">'나'를 골라 주면, 그 사람의 카톡에서 호감 신호를 찾아볼게요.</p></header>
+      <div class="panel info">
+        ${state.isSample ? `<p class="note" style="text-align:left;background:var(--p-us);color:var(--tint);padding:10px 12px;border-radius:12px">샘플이라 예시 값을 넣어 두었어요.</p>` : ""}
+        ${nameField}
+        <div class="field"><b>나는 누구인가요? <span style="color:var(--tint);font-size:14px">꼭 골라 주세요</span></b><div class="me">${[A(), B()].map((p, i) => `<button type="button" data-me="${e(p)}" aria-pressed="${d.me === p}">${e(d.names[i] || p)}</button>`).join("")}</div><small>내가 아닌 쪽이 '그 사람'이 돼요.</small>${infoErr ? `<p class="nt warn" style="margin:0">${e(infoErr)}</p>` : ""}</div>
+        <div class="field"><b>언제부터 좋아했나요?</b>${ymSel}<small>몰라도 괜찮아요. 알려 주면 마음 이야기에 그 달이 나와요.</small></div>
+        <button class="btn primary block" type="button" data-act="info-save">그 사람의 신호 보기</button>
+        ${state.info ? `<button class="btn plain" type="button" data-act="info-skip">바꾸지 않고 돌아가기</button>` : ""}
+        <p class="lockline">${ico("lock")}이 정보도 서버로 보내지 않고, 이 기기에만 저장돼요</p>
+      </div>`;
+    }
     return `<header><h1 class="large" style="font-size:28px">두 분에 대해<br>조금만 알려 주세요</h1><p class="large-sub">알려 주면 사귀기 전과 후, 해마다의 그 달, 실제 MBTI까지 더 자세히 분석해요. 몰라도 괜찮아요.</p></header>
       <div class="panel info">
         ${state.isSample ? `<p class="note" style="text-align:left;background:var(--p-us);color:var(--tint);padding:10px 12px;border-radius:12px">샘플이라 예시 값을 넣어 두었어요.</p>` : ""}
@@ -421,6 +448,46 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     return h;
   }
 
+  /* ---------- 짝사랑 홈·타일 (v17) ---------- */
+  const pc0 = v => Math.round((v || 0) * 100);
+  function crushCards() {
+    const c = state.crush, sp = state.r.speed, rt = sp.reply[c.them];
+    const g = c.signals.filter(x => x.level === "good").length, l = c.signals.filter(x => x.level === "low").length;
+    const t = c.trend;
+    return [
+      ["sig", `${c.score}점`, `좋은 신호 ${g}개 · 아쉬운 신호 ${l}개`],
+      ["first", `${c.them} 먼저 ${pc0(c.initThem)}%`, `조용하다가 먼저 연 대화 ${num(sp.init[c.them])}번`],
+      ["reply", rt.median == null ? "기록이 부족해요" : `보통 ${num1(rt.median)}분`, `${c.them}의 답장 · 5분 안 ${pc0(rt.in5)}%`],
+      ["curious", `질문 ${pc0(c.qThem)}%`, `${c.them}의 말 중 질문 비율`],
+      ["heart", c.heartThem ? `${num(c.heartThem)}번` : "아직 조용해요", "보고 싶어·고마워·귀여워 같은 말"],
+      ["trend", t ? (t.score >= 0.6 ? "가까워지는 중" : t.score > 0.4 ? "비슷하게 이어져요" : "조금 뜸해졌어요") : "조금 더 지켜봐요", t ? `${c.them} 먼저 연락 ${pc0(t.oldInit)}% → ${pc0(t.recInit)}%` : "대화 기간이 아직 짧아요"]
+    ];
+  }
+  function homeCrush() {
+    const r = state.r, ov = r.overview, c = state.crush;
+    let h = "";
+    if (state.isSample) h += `<div class="group sample-note"><span>가상의 두 사람 대화로 보는 중이에요</span><label class="btn primary small" for="file">내 대화 불러오기</label></div>`;
+    h += `<section class="group score-card">
+      <div class="score-line">${C.gauge(c.score, "ring")}<div><p class="score-big"><b>${c.score}</b>점 / 100점</p><p class="score-verdict">${e(c.verdict)}</p><p class="cap" style="font-size:13px">호감 신호 · ${e(c.them)}의 카톡으로 본 재미용 점수</p></div></div>
+      <div class="stats couple" style="padding:0;gap:0"><div class="stats" style="margin:0 -18px -18px"><div><span>주고받은 말풍선</span><b>${num(ov.total)}</b></div><div><span>${e(c.them)}의 먼저 연락</span><b>${num(r.speed.init[c.them])}<small>번</small></b></div><div><span>이야기한 날</span><b>${num(ov.chatDays)}<small>일</small></b></div></div></div>
+    </section>`;
+    h += `<a class="banner" href="#story" data-go="story">${ico("book")}<div><b>${e(c.me)}의 마음 이야기 읽기</b><span>첫 대화부터 오늘까지, 일곱 장으로</span></div>${ico("next", "chev")}</a>`;
+    h += `<section class="sec"><div class="sec-h"><h3>궁금한 걸 눌러 보세요</h3></div><div class="qgrid">${crushCards().map(tile).join("")}</div></section>`;
+    const top = c.advice.items[0];
+    h += `<section class="sec"><div class="sec-h"><h3>다가가려면</h3><a href="#advice" data-go="advice">전체 보기</a></div>
+      <a class="group pad" href="#advice" data-go="advice" style="display:grid;gap:3px;text-decoration:none">${top ? `<span style="font-weight:600">${e(top.title)}</span><span class="cap" style="font-size:15px">${e(top.how)}</span>` : `<span style="font-weight:600">지금처럼 하면 돼요</span><span class="cap" style="font-size:15px">아쉬운 신호가 거의 없어요. 이제 구체적인 약속 하나만 더해 보세요.</span>`}</a></section>`;
+    h += `<section class="sec"><div class="group">
+      <a class="row noicon" href="#info" data-go="info" style="color:var(--tint);font-weight:600;text-decoration:none">정보 고치기 <span class="cap" style="font-weight:400;margin-left:6px">나 · 이름 · 좋아하게 된 달</span></a>
+      <label class="row noicon" for="file" style="color:var(--tint);cursor:pointer;font-weight:600">새 대화 불러오기</label>
+      ${state.isSample ? "" : `<button class="row noicon btn danger" type="button" data-act="forget" style="width:100%;background:none;border-radius:0;justify-content:flex-start;font-weight:400">이 기기에 저장된 결과 지우기</button>`}
+    </div>${trustCard(true)}<p class="status" id="status" role="status" aria-live="polite"></p></section>`;
+    return h;
+  }
+  function crushList() {
+    return `<div class="qgrid">${crushCards().map(tile).join("")}</div>
+      <p class="foot">호감 신호는 카톡 속 말과 시간으로 본 재미용 점수예요. 만나서 나눈 마음은 카톡에 남지 않아요.</p>`;
+  }
+
   function analysisList() {
     return `<div class="qgrid">${cards().map(tile).join("")}</div>
       <p class="foot">MBTI, 하루 루틴, 싸움 주제는 재미로 보는 추정이에요. 다른 커플과 비교한 결과는 없어요.</p>`;
@@ -435,6 +502,13 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const block = (title, inner, cap) => `<section class="block"><h3>${title}</h3>${cap ? `<p class="cap">${cap}</p>` : ""}${inner}</section>`;
   const card = inner => `<div class="card">${inner}</div>`;
   const tiles = items => `<div class="tiles">${items.map(([l, v, s]) => `<div class="tile"><span class="l">${e(l)}</span><span class="v">${v}</span>${s ? `<span class="s">${e(s)}</span>` : ""}</div>`).join("")}</div>`;
+  const legendNames = (a, b) => `<div class="legend"><span><i style="background:var(--a)"></i>${e(a)}</span><span><i style="background:var(--b)"></i>${e(b)}</span></div>`;
+  function tallyNames(rows) {
+    return `<div class="tally">${rows.map(([label, a, b]) => {
+      const t = (a || 0) + (b || 0), pa = t ? a / t * 100 : 50;
+      return `<div class="trow"><div class="lab"><span>${e(label)}</span><span>${num(a || 0)} · ${num(b || 0)}</span></div><div class="split">${t ? `<i class="pa" style="width:${pa}%"></i><i class="pb" style="flex:1"></i>` : ""}</div></div>`;
+    }).join("")}</div>`;
+  }
   function tally(rows) {
     return `<div class="tally">${rows.map(([label, a, b]) => {
       const t = (a || 0) + (b || 0), pa = t ? a / t * 100 : 50;
@@ -456,7 +530,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (x.versus) {
       const [va, vb] = x.versus, mx = Math.max(va || 0, vb || 0, 1);
       const [la, lb] = x.labels || [A(), B()];
-      const better = x.lowBetter ? ((va ?? 1e9) <= (vb ?? 1e9) ? la : lb) : ((va || 0) >= (vb || 0) ? la : lb);
+      const better = x.focus != null ? [la, lb][x.focus] : x.lowBetter ? ((va ?? 1e9) <= (vb ?? 1e9) ? la : lb) : ((va || 0) >= (vb || 0) ? la : lb);
       const row = (p, v, cls) => `<div class="vrow${p === better ? " win" : ""}"><span class="vn ${cls}">${e(p)}</span><span class="vbar"><i class="${cls}" style="width:${v == null ? 0 : Math.max(4, v / mx * 100)}%"></i></span><span class="vv">${v == null ? "-" : e(x.fmt ? x.fmt(v) : num(v))}</span></div>`;
       viz = `<div class="versus">${row(la, va, "pa")}${row(lb, vb, "pb")}</div>`;
     } else if (x.big != null) {
@@ -475,6 +549,56 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const pc = v => Math.round((v || 0) * 100);
   const mins = v => v == null ? "-" : num1(v) + "분";
   const INSIGHTS = {
+    sig() {
+      const c = state.crush, ord = { good: 0, mid: 1, low: 2 }, tag = { good: "좋은 신호", mid: "보통", low: "아쉬운 신호" };
+      return c.signals.slice().sort((a, b) => ord[a.level] - ord[b.level]).map(x => ({ title: `${tag[x.level]} · ${x.title}${x.sub ? ` (${x.sub})` : ""}`, text: x.text, versus: x.versus, labels: x.labels || [c.me, c.them], fmt: x.fmt }));
+    },
+    first() {
+      const c = state.crush, sp = state.r.speed, me = c.me, th = c.them;
+      const op = c.openers.filter((o, i, a) => a.findIndex(x => x.text === o.text) === i).map(o => o.text);
+      const sInit = c.signals.find(x => x.key === "init");
+      return [
+        { title: "조용할 때 먼저 말을 건 사람", text: sInit.text, versus: [sp.init[me], sp.init[th]], labels: [me, th], fmt: v => num(v) + "번" },
+        { title: "답을 기다리지 않고 이어 보낸 말", text: `답이 오기 전에 한 번 더 보낸 건 ${me} ${num(sp.doubles[me])}번, ${th} ${num(sp.doubles[th])}번이에요. ${sp.doubles[th] >= sp.doubles[me] * 0.8 ? "그 사람도 할 말이 많아질 때가 있어요." : "하고 싶은 말이 더 많은 쪽은 아직 나예요."}`, versus: [sp.doubles[me], sp.doubles[th]], labels: [me, th], fmt: v => num(v) + "번" },
+        op.length ? { title: `${th}${U.iga(th).slice(th.length)} 먼저 건넨 첫마디`, text: "한동안 조용하다가 그 사람이 먼저 보낸 말이에요. 최근 것부터 보여 줘요.", chips: op.reverse() } : { title: "그 사람의 첫마디", text: `아직 ${U.iga(th)} 먼저 말을 건 기록은 찾지 못했어요.` }
+      ];
+    },
+    reply() {
+      const c = state.crush, sp = state.r.speed, me = c.me, th = c.them, rm = sp.reply[me], rt = sp.reply[th];
+      const ms = c.monthly.filter(m => m.replyThem != null), f = ms[0], l = ms[ms.length - 1];
+      return [
+        { title: "보통 걸리는 시간", text: (rt.median || 0) <= (rm.median || 0) + 1 ? `${th}도 ${me}만큼 빨리 답해요. 보통 ${num1(rt.median)}분이에요.` : `${me}는 보통 ${num1(rm.median)}분, ${th}는 ${num1(rt.median)}분 만에 답해요.`.replace(`${me}는`, U.eunneun(me)).replace(`${th}는`, U.eunneun(th)), versus: [rm.median, rt.median], labels: [me, th], lowBetter: true, fmt: mins },
+        { title: "5분 안에 온 답장", text: `${th}의 답장 중 ${pc0(rt.in5)}%가 5분 안에 왔어요.`, versus: [pc0(rm.in5), pc0(rt.in5)], labels: [me, th], fmt: v => v + "%" },
+        f && l && f !== l ? { title: "처음과 요즘", text: l.replyThem < f.replyThem ? `${th}의 답장이 빨라졌어요. ${U.fmtDate(f.month)} ${num1(f.replyThem)}분 → ${U.fmtDate(l.month)} ${num1(l.replyThem)}분.` : l.replyThem > f.replyThem ? `${th}의 답장이 조금 느려졌어요(${num1(f.replyThem)}분 → ${num1(l.replyThem)}분). 바쁜 시기일 수도 있어요.` : `${th}의 답장 속도는 처음과 비슷해요.`, versus: [f.replyThem, l.replyThem], labels: ["처음 달", "최근 달"], lowBetter: true, fmt: mins } : null
+      ];
+    },
+    curious() {
+      const c = state.crush, r = state.r, me = c.me, th = c.them, b = r.balance.per, nc = r.nicknames.nameCalls || {};
+      return [
+        { title: "질문 비율", text: c.signals.find(x => x.key === "curious").text, versus: [pc0(c.qMe), pc0(c.qThem)], labels: [me, th], fmt: v => v + "%" },
+        { title: "안부를 묻는 말", text: `"밥은 먹었어?", "잘 잤어?" 같은 안부를 ${th}${U.iga(th).slice(th.length)} ${num(b[th].askCare)}번 물었어요.`, versus: [b[me].askCare, b[th].askCare], labels: [me, th], fmt: v => num(v) + "번" },
+        (nc[me] || nc[th]) ? { title: "이름을 불러 준 횟수", text: `${th}${U.iga(th).slice(th.length)} ${me}의 이름을 부른 건 ${num(nc[th] || 0)}번이에요.`, versus: [nc[me] || 0, nc[th] || 0], labels: [me, th], fmt: v => num(v) + "번" } : null
+      ];
+    },
+    heart() {
+      const c = state.crush, L = state.r.love, me = c.me, th = c.them, ll = state.r.loveLang;
+      const out = [{ title: "마음을 드러낸 말", text: c.signals.find(x => x.key === "heart").text, versus: [c.heartMe, c.heartThem], labels: [me, th], fmt: v => num(v) + "번" }];
+      const parts = [["보고 싶어", L.miss[th]], ["고마워", L.thanks[th]], ["예뻐·귀여워", L.cute[th]], ["좋아해", L.like[th]]].filter(x => x[1]);
+      if (parts.length) out.push({ title: `${th}의 말 속에서`, text: "그 사람이 보낸 마음 표현을 종류별로 세어 봤어요.", chips: parts.map(([k, v]) => `${k} ${num(v)}번`) });
+      if (ll && ll[th]) {
+        const x = ll[th], top = x.cats.find(z => z.key === x.top);
+        out.push({ title: `${th}의 사랑의 언어 (재미용)`, text: `${U.eunneun(th)} 주로 '${top.label}'${roP(top.label)} 마음을 표현하는 편이에요.`, langs: x.cats.slice().sort((a, b) => b.share - a.share).map(z => ({ label: z.label, share: z.share, top: z.key === x.top })), quotes: top.examples.map(q => q.text) });
+      }
+      return out;
+    },
+    trend() {
+      const c = state.crush, t = c.trend, th = c.them;
+      if (!t) return [{ title: "요즘 흐름", text: c.signals.find(x => x.key === "trend").text }];
+      return [
+        { title: `${th}의 먼저 연락`, text: c.signals.find(x => x.key === "trend").text, versus: [pc0(t.oldInit), pc0(t.recInit)], labels: ["이전", "최근 90일"], fmt: v => v + "%" },
+        { title: `${th}의 하루 말풍선`, text: t.change > 0.1 ? `최근 석 달, ${th}의 말풍선이 하루 ${num1(t.oldRate)}개 → ${num1(t.recRate)}개로 늘었어요.` : t.change < -0.1 ? `최근 석 달, ${th}의 말풍선이 하루 ${num1(t.oldRate)}개 → ${num1(t.recRate)}개로 줄었어요.` : `${th}의 하루 말풍선은 이전과 비슷해요(${num1(t.recRate)}개).`, versus: [t.oldRate, t.recRate], labels: ["이전", "최근 90일"], fmt: v => num1(v) + "개" }
+      ];
+    },
     freq() {
       const r = state.r, ov = r.overview, wd = r.weekday.indexOf(Math.max(...r.weekday)), hr = r.hourly.indexOf(Math.max(...r.hourly));
       const a = ov.byWho[A()], b = ov.byWho[B()], more = a >= b ? A() : B(), even = Math.abs(a - b) / ov.total < 0.1;
@@ -614,6 +738,50 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const yeoss = w => w + (U.jong(w) ? "이었어요" : "였어요");
 
   const RENDER = {
+    sig() {
+      const c = state.crush;
+      if (CAP) {
+        CAP.read = `<section class="read"><h2>호감 신호 ${c.score}점 <span class="fun">재미용</span></h2><p>${e(c.them)}의 카톡에서 일곱 가지 신호를 찾아 더한 점수예요. 먼저 연락하는지, 답장이 빠른지, 나를 궁금해하는지 같은 것들이에요.</p><p>카톡에 남지 않는 마음(만나서 한 말, 표정, 목소리)은 셀 수 없어요. 그러니 점수는 참고만 해 주세요.</p></section>`;
+        CAP.concl = `<section class="conclusion"><div class="eyebrow">이 코너의 결론</div><p>${e(c.score >= 60 ? `${c.them}에게서 좋은 신호가 꽤 보여요. 이제는 신호를 세기보다, 한 걸음 다가가 볼 때예요.` : c.score >= 40 ? `${c.them}의 마음은 반쯤 열린 문 같아요. 조급해하지 말고, 대답하고 싶어지는 질문과 구체적인 약속으로 천천히 다가가 봐요.` : `지금은 신호가 조용해요. 하지만 카톡은 마음의 아주 일부만 보여 줘요. 서두르지 말고, 나를 먼저 아끼면서 천천히 지켜봐요.`)}</p></section>`;
+      }
+      return block("일곱 가지 신호", table(["신호", "점수", "비중"], c.signals.map(x => [e(x.title), x.neutral ? "-" : Math.round(x.score * 100) + "점", x.w + "%"]), [1, 2]), "신호마다 0~100점으로 바꾼 뒤 비중만큼 더했어요. 기준: 먼저 연락 50%면 만점, 5분 안 답장 70%면 만점, 대화 비중 45%면 만점, 질문 12%면 만점, 마음 표현 1000개당 15번이면 만점, 함께하자는 말 1000개당 40번이면 만점.");
+    },
+    first() {
+      const c = state.crush, sp = state.r.speed, keys = c.monthly.filter(m => m.initShare != null);
+      if (CAP) CAP.read = `<section class="read"><h2>누가 먼저 다가갈까</h2><p>4시간 넘게 조용하다가 처음 말을 건 사람을 '먼저 연락'으로 셌어요. 그 사람 머릿속에 누군가가 먼저 떠올랐다는 뜻이니까요.</p></section>`;
+      return block("먼저, 이어서, 마지막", legendNames(c.me, c.them) + tallyNames([["먼저 연락", sp.init[c.me], sp.init[c.them]], ["연달아 보내기", sp.doubles[c.me], sp.doubles[c.them]], ["대화 마지막 말", sp.enders[c.me], sp.enders[c.them]]]))
+        + (keys.length > 1 ? block(`달마다 ${e(c.them)}의 먼저 연락 비율`, card(C.line({ labels: monthLabels(keys.map(k => k.month)), tipLabels: keys.map(k => U.fmtDate(k.month)), unit: "%", series: [{ name: c.them, color: "var(--b)", values: keys.map(k => Math.round(k.initShare * 100)) }] }))) : "");
+    },
+    reply() {
+      const c = state.crush, sp = state.r.speed, ks = c.monthly.filter(m => m.replyThem != null || m.replyMe != null);
+      if (CAP) CAP.read = `<section class="read"><h2>답장은 얼마나 빨리 올까</h2><p>상대 말에 60분 안에 답한 것만 '답장'으로 셌어요. 그보다 늦으면 새 대화로 봤어요. 답장이 늦다고 마음이 없는 건 아니에요. 바쁜 사람일 수도 있어요.</p></section>`;
+      return block("답장 속도", table(["", "중간값", "5분 안", "30분 안"], [c.me, c.them].map(p => { const x = sp.reply[p]; return [e(p), num1(x.median) + "분", U.pct(x.in5, 1) + "%", U.pct(x.in30, 1) + "%"]; }), [1, 2, 3]))
+        + (ks.length > 1 ? block("달마다 답장 속도(중간값)", card(C.line({ labels: monthLabels(ks.map(k => k.month)), tipLabels: ks.map(k => U.fmtDate(k.month)), unit: "분", series: [{ name: c.me, color: "var(--a)", values: ks.map(k => k.replyMe) }, { name: c.them, color: "var(--b)", values: ks.map(k => k.replyThem) }] }))) : "");
+    },
+    curious() {
+      const c = state.crush, b = state.r.balance.per;
+      if (CAP) CAP.read = `<section class="read"><h2>그 사람도 나를 궁금해할까</h2><p>물음표가 있거나 질문으로 끝나는 말을 '질문'으로 셌어요. 질문은 대화를 이어 가고 싶다는 마음이고, '너에 대해 더 알고 싶어'라는 말이기도 해요.</p></section>`;
+      return block("질문과 안부", legendNames(c.me, c.them) + tallyNames([["질문", b[c.me].questions, b[c.them].questions], ["안부 질문", b[c.me].askCare, b[c.them].askCare]]));
+    },
+    heart() {
+      const c = state.crush, L = state.r.love;
+      if (CAP) CAP.read = `<section class="read"><h2>마음은 얼마나 드러날까</h2><p>보고 싶어, 고마워, 예뻐·귀여워, 좋아해, 사랑해 같은 말을 사람마다 셌어요. 표현이 서툰 사람도 있으니, 숫자보다 '늘어나는지'를 봐 주세요.</p></section>`;
+      return block("마음 표현", legendNames(c.me, c.them) + tallyNames([["보고 싶어", L.miss[c.me], L.miss[c.them]], ["고마워", L.thanks[c.me], L.thanks[c.them]], ["예뻐·귀여워", L.cute[c.me], L.cute[c.them]], ["좋아해", L.like[c.me], L.like[c.them]], ["사랑해", L.love[c.me], L.love[c.them]]]));
+    },
+    trend() {
+      const c = state.crush, ks = c.monthly;
+      if (CAP) CAP.read = `<section class="read"><h2>요즘 우리는</h2><p>최근 90일과 그 이전을 비교했어요. 그 사람이 먼저 연락하는 비율과 하루 말풍선이 늘었는지를 봐요.</p></section>`;
+      return ks.length > 1 ? block(`달마다 ${e(c.them)}의 몫`, card(C.line({ labels: monthLabels(ks.map(k => k.month)), tipLabels: ks.map(k => U.fmtDate(k.month)), unit: "%", series: [{ name: "말풍선 비중", color: "var(--b)", values: ks.map(k => Math.round(k.share * 100)) }, { name: "먼저 연락 비율", color: "var(--accent)", values: ks.map(k => k.initShare == null ? null : Math.round(k.initShare * 100)) }] })), "두 사람 말풍선 중 그 사람 몫, 그리고 조용하다가 먼저 연 대화 중 그 사람 몫이에요.") : `<p class="cap">달마다 비교할 만큼 기간이 길지 않아요.</p>`;
+    },
+    crushAdvice() {
+      const c = state.crush, a = c.advice;
+      let h = `<section class="read"><h2>${e(c.them)}에게 한 걸음 더</h2><p>아쉬운 신호에 맞춰 해 볼 만한 것들을 골랐어요. 정답은 아니에요. 그 사람을 가장 잘 아는 건 결국 ${e(c.me)}예요.</p></section>`;
+      const item = (it, i) => `<div class="item"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)}</h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div><div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div></div>`;
+      if (a.items.length) h += block("해 볼 만한 것", `<div class="items">${a.items.map(item).join("")}</div>`);
+      if (a.good.length) h += block("이미 좋은 신호예요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">좋은 신호</span></h4><p>${e(g.why)}</p></div>`).join("")}</div>`);
+      h += block("늘 도움이 되는 것", `<div class="items">${a.general.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill gen">일반적인 조언</span></h4><p>${e(g.how)}</p></div>`).join("")}</div>`);
+      return h;
+    },
     lang() {
       const ll = state.r.loveLang;
       if (CAP) CAP.read = `<section class="read"><h2>사랑을 말하는 다섯 가지 방법 <span class="fun">재미용</span></h2><p>사람마다 사랑을 표현하고 느끼는 방식이 다르다는 생각이 있어요. 게리 채프먼은 이걸 '사랑의 언어' 다섯 가지로 나눴어요. 인정하는 말, 함께하는 시간, 선물, 봉사, 스킨십이에요.</p><p>두 사람이 카톡에서 각 언어에 해당하는 말을 얼마나 썼는지 세서 짐작했어요. 만나서 한 행동은 카톡에 남지 않으니, 실제와 다를 수 있어요.</p></section>`;
@@ -646,12 +814,12 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       return h;
     },
     story() {
-      const s = state.story, r = state.r;
+      const s = CRUSH() ? state.crush.story : state.story, r = state.r;
       const op = (s.cover.opening || []).map((l, i) => `<p style="animation-delay:${0.3 + i * 0.9}s">${e(l)}</p>`).join("");
       const n = (s.cover.opening || []).length;
       const st = s.cover.start ? `<p class="start" style="animation-delay:${0.3 + n * 0.9 + 0.8}s">${e(s.cover.start)}</p>` : "";
       const opening = op ? `<section class="opening" aria-label="오프닝">${op}${st}</section>` : "";
-      const cover = `<section class="group cover"><p class="eyebrow">TALK VIEW</p><h2>${e(s.cover.title)}</h2><p class="sub">${e(s.cover.subtitle)}</p>${C.gauge(s.cover.score, "ring-lg")}<div class="eyebrow">사랑 지수 · ${verdict(s.cover.score)}</div><div class="parts">${r.score.parts.map(p => `<span>${e(p.label)} ${p.pts}/${p.max}</span>`).join("")}</div></section>`;
+      const cover = `<section class="group cover"><p class="eyebrow">TALK VIEW</p><h2>${e(s.cover.title)}</h2><p class="sub">${e(s.cover.subtitle)}</p>${C.gauge(s.cover.score, "ring-lg")}<div class="eyebrow">${CRUSH() ? `호감 신호 · ${e(state.crush.verdict)}` : `사랑 지수 · ${verdict(s.cover.score)}`}</div>${CRUSH() ? "" : `<div class="parts">${r.score.parts.map(p => `<span>${e(p.label)} ${p.pts}/${p.max}</span>`).join("")}</div>`}</section>`;
       const toc = `<nav class="toc" aria-label="목차">${s.chapters.map(c => `<a href="#story" data-jump="${c.id}">${e(c.title.replace(/^\d\. /, ""))}</a>`).join("")}</nav>`;
       return opening + cover + toc + s.chapters.map(c => `<article class="chapter" id="ch-${c.id}"><h2>${e(c.title)}</h2>${c.blocks.map(storyBlock).join("")}</article>`).join("");
     },
@@ -788,6 +956,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       const d = readInfoForm();
       const olds = [A(), B()], news = d.names.map((n, i) => n || olds[i]);
       if (news[0] === news[1]) { infoErr = "두 사람 이름이 같으면 구분할 수 없어요. 다르게 적어 주세요."; render(); return; }
+      if (CRUSH() && !d.me) { infoErr = "'나'를 골라 주세요. 그래야 그 사람의 신호를 볼 수 있어요."; render(); return; }
       infoErr = "";
       const map = {}; olds.forEach((o, i) => { if (news[i] !== o) map[o] = news[i]; });
       let mbti = d.mbti || {}, me = d.me || null;
@@ -848,8 +1017,9 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   // 시작: 이 기기에 저장된 결과가 있으면 홈, 없으면 시작 화면
   state = load();
   if (state && !state.r) state = null;
+  if (state && state.rel === "crush" && state.info && state.info.me && window.Crush) { try { state.crush = Crush.make(state.r, state.info.me, { likeSince: state.info.since }); } catch (_) { state.crush = null; } }
   if (state && state.r && !state.r.days) state.couple = null; // v10 이전 결과: 사귄 날 분석은 대화를 다시 불러와야 함
-  if (state) rel = "love";
+  if (state) rel = state.rel || "love";
   render();
   inbox();
 })();

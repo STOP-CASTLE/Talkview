@@ -25,7 +25,7 @@
     const traits = [
       { k: "init", s: initShare - 0.5, head: "먼저 다가가는 사람", line: `한동안 조용하다가 대화를 다시 여는 건 대개 ${p}의 몫이었어요. 4시간 넘게 말이 없을 때 먼저 말을 건 게 ${Math.round(initShare * 100)}%예요.` },
       { k: "fast", s: rp.median != null && rq.median != null ? (rq.median - rp.median) / Math.max(1, rq.median) * 0.6 : 0, head: "기다리게 하지 않는 사람", line: `${p}의 답장은 보통 ${num1(rp.median)}분 안에 왔어요. 다섯 번 중 ${Math.round(rp.in5 * 5)}번은 5분도 걸리지 않았어요.` },
-      { k: "love", s: (L.love[p] - L.love[q]) / Math.max(1, L.love.total), head: "사랑한다는 말을 아끼지 않는 사람", line: `"사랑해"를 ${num(L.love[p])}번 보냈어요. 마음이 생기면 굳이 숨기지 않았어요.` },
+      { k: "love", s: L.love[p] ? (L.love[p] - L.love[q]) / Math.max(1, L.love.total) : -1, head: "사랑한다는 말을 아끼지 않는 사람", line: `"사랑해"를 ${num(L.love[p])}번 보냈어요. 마음이 생기면 굳이 숨기지 않았어요.` },
       { k: "care", s: (careOf(p) - careOf(q)) / Math.max(1, careOf(p) + careOf(q)), head: "하루를 챙기는 사람", line: `밥은 먹었는지, 잘 잤는지, 아프진 않은지. ${p}의 안부와 걱정은 ${num(careOf(p))}번이었어요.` }
     ].sort((a, b) => b.s - a.s);
     const top = traits[0], second = traits[1];
@@ -274,5 +274,5 @@
 
     return { cover, chapters: ch };
   }
-  return { story };
+  return { story, portrait };
 });
