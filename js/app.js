@@ -47,7 +47,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   };
   const TOP = { home: "홈", story: "사랑 이야기", analysis: "분석", advice: "더 사랑하려면", info: "우리 정보", safe: "안전한 이유" };
   const NAV = [["home", "홈", "home"], ["story", "이야기", "book"], ["analysis", "분석", "grid"], ["advice", "조언", "sparkle"]];
-  let state = null, route = "home", depth = 0;
+  let state = null, route = "home", depth = 0, lastRoute = null;
 
   /* ---------- 분석 실행 ---------- */
   function compute(files, isSample) {
@@ -59,6 +59,20 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     return { r, adv, sum: Summary.summary(r, adv), story: Story.story(r), isSample, others: parsed.others, savedAt: Date.now(), info: null, couple: null };
   }
   // 사용자가 알려 준 정보(사귄 날·MBTI)를 반영해 다시 계산 (v10)
+  // 두 사람 이름 바꾸기 (v16): 결과 객체 안의 이름 키·값을 통째로 바꾸고 조언·요약을 다시 만든다.
+  // 대화 원문(메시지 글) 속 단어는 건드리지 않는다 — 값이 이름과 '정확히 같을' 때만 바꿈.
+  function renameAll(map) {
+    const walk = v => {
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === "object") { const o = {}; for (const k in v) o[k in map ? map[k] : k] = walk(v[k]); return o; }
+      return typeof v === "string" && v in map ? map[v] : v;
+    };
+    if (!state.origNames) state.origNames = [state.r.A, state.r.B];
+    state.r = walk(state.r);
+    state.adv = Advice.advice(state.r);
+    state.sum = Summary.summary(state.r, state.adv);
+  }
+  const cleanName = n => { const c = String(n).replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim(); return c && c !== n ? c : n; };
   function applyInfo(info) {
     state.info = info;
     state.couple = Couple.make(state.r, info);
@@ -182,7 +196,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
         </div>`;
     }
     $("#main").innerHTML = `<div class="view">${html}</div>`;
-    window.scrollTo(0, 0); onScroll();
+    if (route !== lastRoute) window.scrollTo(0, 0); lastRoute = route; onScroll();
   }
   const largeTitle = (t, sub) => `<header><h1 class="large">${e(t)}</h1>${sub ? `<p class="large-sub">${e(sub)}</p>` : ""}</header>`;
 
@@ -307,12 +321,13 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   }
 
   /* ---------- 우리 정보 (사귄 날·MBTI) v10 ---------- */
-  let infoDraft = null;
+  let infoDraft = null, infoErr = "";
   function infoForm() {
     const r = state.r, ov = r.overview;
     if (!infoDraft) {
       infoDraft = state.info ? JSON.parse(JSON.stringify(state.info)) : { since: "", me: null, mbti: {} };
-      if (!state.info && state.isSample) infoDraft = { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" } };
+      infoDraft.names = [A(), B()].map(n => state.info ? n : cleanName(n));
+      if (!state.info && state.isSample) infoDraft = { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" }, names: [A(), B()] };
     }
     const d = infoDraft;
     const opt = p => `<select data-mbti="${e(p)}" aria-label="${e(p)}의 MBTI"><option value="">모르겠어요</option>${Couple.TYPES.map(t => `<option${d.mbti[p] === t ? " selected" : ""}>${t}</option>`).join("")}</select>`;
@@ -322,9 +337,10 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     return `<header><h1 class="large" style="font-size:28px">두 분에 대해<br>조금만 알려 주세요</h1><p class="large-sub">알려 주면 사귀기 전과 후, 해마다의 그 달, 실제 MBTI까지 더 자세히 분석해요. 몰라도 괜찮아요.</p></header>
       <div class="panel info">
         ${state.isSample ? `<p class="note" style="text-align:left;background:var(--p-us);color:var(--tint);padding:10px 12px;border-radius:12px">샘플이라 예시 값을 넣어 두었어요.</p>` : ""}
-        <div class="field"><b>나는 누구인가요?</b><div class="me">${[A(), B()].map(p => `<button type="button" data-me="${e(p)}" aria-pressed="${d.me === p}">${e(p)}</button>`).join("")}</div><small>대화에서 찾은 두 사람이에요. 고르지 않아도 돼요.</small></div>
+        <div class="field"><b>이렇게 불러도 될까요?</b>${[0, 1].map(i => { const cur = [A(), B()][i], orig = (state.origNames || [A(), B()])[i]; return `<div class="mrow"><span class="nm" style="font-size:14px;font-weight:600;color:var(--muted)">카톡 이름<small style="font-size:13px;color:var(--fg);word-break:break-all">${e(orig)}</small></span><input type="text" data-rename="${i}" value="${e(d.names[i])}" maxlength="12" placeholder="${e(cur)}" aria-label="${e(orig)}을 부를 이름" autocomplete="off"></div>`; }).join("")}<small>카톡에 애칭이나 이모티콘으로 저장돼 있으면 글이 어색할 수 있어요. 이야기에 쓸 이름으로 바꿔 주세요.${[A(), B()].some(n => cleanName(n) !== n) ? " 기호는 미리 빼 두었어요." : ""}</small>${infoErr ? `<p class="nt warn" style="margin:0">${e(infoErr)}</p>` : ""}</div>
+        <div class="field"><b>나는 누구인가요?</b><div class="me">${[A(), B()].map((p, i) => `<button type="button" data-me="${e(p)}" aria-pressed="${d.me === p}">${e(d.names[i] || p)}</button>`).join("")}</div><small>대화에서 찾은 두 사람이에요. 고르지 않아도 돼요.</small></div>
         <div class="field"><b>언제부터 사귀었나요?</b><div class="ym"><select id="since-y" aria-label="사귄 해"><option value="">연도</option>${yrs.map(y => `<option${sy === y ? " selected" : ""}>${y}</option>`).join("")}</select><select id="since-m" aria-label="사귄 달"><option value="">월</option>${Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2, "0")}"${sm === m ? " selected" : ""}>${m}월</option>`).join("")}</select></div><small>몇 월인지만 알려 주면 돼요. 첫 대화(${U.fmtDate(ov.first.slice(0, 7))})보다 앞이어도 괜찮아요.</small></div>
-        <div class="field"><b>MBTI를 알려 주세요</b>${[A(), B()].map(p => `<div class="mrow"><span class="nm">${e(p)}${tag(p) ? `<small>${tag(p)}</small>` : ""}</span>${opt(p)}</div>`).join("")}<small>카톡 말투로 추정한 성향과 비교해 볼게요.</small></div>
+        <div class="field"><b>MBTI를 알려 주세요</b>${[A(), B()].map((p, i) => `<div class="mrow"><span class="nm" style="word-break:break-all">${e(d.names[i] || p)}${tag(p) ? `<small>${tag(p)}</small>` : ""}</span>${opt(p)}</div>`).join("")}<small>카톡 말투로 추정한 성향과 비교해 볼게요.</small></div>
         <button class="btn primary block" type="button" data-act="info-save">이대로 분석 보기</button>
         <button class="btn plain" type="button" data-act="info-skip">${state.info ? "바꾸지 않고 돌아가기" : "건너뛰기"}</button>
         <p class="lockline">${ico("lock")}이 정보도 서버로 보내지 않고, 이 기기에만 저장돼요</p>
@@ -332,6 +348,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   }
   function readInfoForm() {
     const d = infoDraft || { mbti: {} };
+    document.querySelectorAll("[data-rename]").forEach(x => { d.names[+x.dataset.rename] = x.value.trim(); });
     const y = $("#since-y"), m = $("#since-m"); d.since = y && m && y.value && m.value ? `${y.value}-${m.value}` : "";
     document.querySelectorAll("[data-mbti]").forEach(x => { if (x.value) d.mbti[x.dataset.mbti] = x.value; else delete d.mbti[x.dataset.mbti]; });
     return d;
@@ -767,11 +784,26 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     else if (act === "sample") sample();
     else if (act === "hide-install") { hideInstall = true; render(); }
     else if (act === "nettest") runNetTest();
-    else if (act === "info-save") { const d = readInfoForm(); infoDraft = null; applyInfo({ since: d.since || null, me: d.me || null, mbti: d.mbti || {} }); go("home", true); }
-    else if (act === "info-skip") { infoDraft = null; if (!state.info) { state.couple = Couple.make(state.r, {}); } go("home", true); }
+    else if (act === "info-save") {
+      const d = readInfoForm();
+      const olds = [A(), B()], news = d.names.map((n, i) => n || olds[i]);
+      if (news[0] === news[1]) { infoErr = "두 사람 이름이 같으면 구분할 수 없어요. 다르게 적어 주세요."; render(); return; }
+      infoErr = "";
+      const map = {}; olds.forEach((o, i) => { if (news[i] !== o) map[o] = news[i]; });
+      let mbti = d.mbti || {}, me = d.me || null;
+      if (Object.keys(map).length) {
+        mbti = Object.fromEntries(Object.entries(mbti).map(([k, v]) => [map[k] || k, v]));
+        if (me && map[me]) me = map[me];
+        renameAll(map);
+      }
+      infoDraft = null; applyInfo({ since: d.since || null, me, mbti }); go("home", true);
+    }
+    else if (act === "info-skip") { infoDraft = null; infoErr = ""; if (!state.info) { state.couple = Couple.make(state.r, {}); } go("home", true); }
     else if (act === "kakao" && !IN_APP) { setTimeout(() => flash("카카오톡이 열리지 않으면 직접 카카오톡을 열어 주세요."), 1500); }
     else if (act === "forget") { try { localStorage.removeItem(STORE); } catch (_) { /* 무시 */ } state = null; rel = null; go("home", true); setTimeout(() => flash("이 기기에 저장된 결과를 지웠어요."), 0); }
   });
+  // 이름 칸을 다 쓰면(포커스 빠질 때) 아래 버튼·MBTI 이름도 바로 바뀌게
+  document.addEventListener("change", ev => { if (ev.target.matches && ev.target.matches("[data-rename]") && route === "info") { readInfoForm(); render(); } });
   $("#file").addEventListener("change", ev => { if (ev.target.files.length) handle(ev.target.files); ev.target.value = ""; });
   let dragN = 0;
   document.addEventListener("dragenter", ev => { if ([...(ev.dataTransfer?.types || [])].includes("Files")) { ev.preventDefault(); dragN++; document.body.classList.add("dragging"); } });
