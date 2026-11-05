@@ -78,6 +78,14 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     } catch (_) { return null; }
   }
 
+  // 글 파일 읽기: 보통 UTF-8, 깨지면(엑셀로 저장한 CSV 등) EUC-KR로 다시 읽는다
+  async function readText(f) {
+    const buf = await f.arrayBuffer();
+    const u = new TextDecoder("utf-8").decode(buf);
+    const bad = (u.match(/\uFFFD/g) || []).length;
+    if (bad > 20 && bad > u.length / 1000) { try { return new TextDecoder("euc-kr").decode(buf); } catch (_) { /* 그대로 */ } }
+    return u;
+  }
   async function readFiles(list) {
     const out = [];
     for (const f of list) {
@@ -91,12 +99,12 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       if (isZip) {
         if (!window.JSZip) throw new Error("zip을 여는 도구를 불러오지 못했어요. 압축을 풀어 txt 파일로 올려 주세요.");
         const z = await JSZip.loadAsync(f);
-        const names = Object.keys(z.files).filter(n => /\.txt$/i.test(n) && !z.files[n].dir);
+        const names = Object.keys(z.files).filter(n => /\.(txt|csv)$/i.test(n) && !z.files[n].dir);
         for (const n of names) out.push({ name: n, text: await z.files[n].async("string") });
         continue;
-      } else out.push({ name: f.name, text: await f.text() });
+      } else out.push({ name: f.name, text: await readText(f) });
     }
-    if (!out.length) throw new Error("txt 파일을 찾지 못했어요.");
+    if (!out.length) throw new Error("대화 파일(txt 또는 csv)을 찾지 못했어요.");
     return out;
   }
 
@@ -203,7 +211,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     phone: IOS
       ? [["카카오톡에서 분석할 1:1 채팅방을 열어요.", ""], ["오른쪽 위 메뉴(≡) → 설정(톱니바퀴)을 눌러요.", ""], ["<b>대화 내용 내보내기</b> → <b>모든 메시지 도큐먼트로 저장</b>을 눌러요.", "아이폰에 파일로 바로 저장돼요. 사진이 많아 파일이 커도 괜찮아요(대화 글만 골라 읽어요). '텍스트 메시지만 보내기'는 메일 화면이 떠서 쓰지 않아요."], ["TALK VIEW로 돌아와 <b>카톡 대화 불러오기</b>를 눌러요.", "파일 창의 '최근 항목'에서 방금 저장된 파일을 누르면 바로 분석돼요."]]
       : [["카카오톡에서 분석할 1:1 채팅방을 열어요.", ""], ["오른쪽 위 메뉴(≡) → 설정(톱니바퀴)을 눌러요.", ""], ["대화 내용 내보내기 → 텍스트 메시지만 보내기", IN_APP ? "공유 목록에서 TALK VIEW를 누르면 끝이에요." : "파일로 저장한 뒤 위 버튼으로 골라요."]],
-    pc: [["PC 카카오톡에서 채팅방을 열어요.", ""], ["메뉴(≡) → 대화 내용 → 대화 내보내기", "Ctrl+S로도 저장할 수 있어요."], ["저장된 txt 파일을 위 버튼으로 고르거나 화면에 끌어다 놓아요.", ""]]
+    pc: [["PC 카카오톡에서 채팅방을 열어요.", ""], ["메뉴(≡) → 대화 내용 → 대화 내보내기", "윈도우는 Ctrl+S로도 저장할 수 있어요."], ["저장된 파일을 위 버튼으로 고르거나 화면에 끌어다 놓아요.", "윈도우는 txt, 맥은 csv 파일로 저장돼요. 둘 다 돼요."]]
   };
   let guideTab = MOBILE ? "phone" : "pc";
   const stepsHtml = () => STEPS[guideTab].map(([t, n], i) => `<div class="row noicon"><span class="step-n">${i + 1}</span><div class="body step-t">${t}${n ? `<small>${n}</small>` : ""}</div></div>`).join("");

@@ -31,7 +31,55 @@
     return { type: "text" };
   }
 
+  /* ---------- CSV (맥용 카카오톡 "대화 내보내기") ----------
+     머리줄 예: Date,User,Message  /  행 예: 2024-12-06 20:32:15,"이름","메시지"(줄바꿈은 따옴표 안에)
+     날짜는 "2024-12-06 20:32(:15)", "2024. 12. 6. 오후 8:32", "2024/12/06 20:32" 모두 받는다. */
+  const RE_CSV_HEAD = /^\uFEFF?\s*"?(date|날짜|일시|시간)"?\s*[,\t]\s*"?(user|사용자|보낸\s?사람|이름|name)"?\s*[,\t]\s*"?(message|메시지|메세지|내용)"?/i;
+  const RE_CSV_ROW = /^\uFEFF?"?\d{4}[-./]\s*\d{1,2}[-./]\s*\d{1,2}\.?\s+(오전|오후)?\s*\d{1,2}:\d{2}(:\d{2})?"?\s*[,\t]/;
+  function looksCSV(raw) {
+    const first = String(raw).replace(/^\uFEFF/, "").split(/\r?\n/).find(l => l.trim()) || "";
+    return RE_CSV_HEAD.test(first) || RE_CSV_ROW.test(first);
+  }
+  function csvRows(text, delim) {
+    const rows = []; let row = [], f = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"' && f === "") q = true;
+      else if (c === delim) { row.push(f); f = ""; }
+      else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; }
+      else if (c !== "\r") f += c;
+    }
+    if (f !== "" || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  function csvTime(s) {
+    s = s.trim(); let m;
+    if ((m = s.match(/^(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})\.?\s+(오전|오후)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/))) {
+      const h = m[4] ? toH(m[4], m[5]) : +m[5];
+      return new Date(+m[1], +m[2] - 1, +m[3], h, +m[6], +(m[7] || 0)).getTime();
+    }
+    return NaN;
+  }
+  function parseCSV(raw) {
+    const text = String(raw).replace(/^\uFEFF/, "");
+    const first = text.split(/\r?\n/)[0] || "";
+    const delim = (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? "\t" : ",";
+    const rows = csvRows(text, delim);
+    if (rows.length && RE_CSV_HEAD.test(rows[0].join(delim))) rows.shift();
+    const out = []; let seq = 0;
+    for (const r of rows) {
+      if (r.length < 3) continue;
+      const t = csvTime(r[0]); if (isNaN(t)) continue;
+      const who = (r[1] || "").trim(); if (!who) continue;
+      const msg = r.slice(2).join(delim).replace(/\n+$/, "");
+      out.push(Object.assign({ t, who, text: msg, seq: seq++ }, classify(msg)));
+    }
+    return out;
+  }
+
   function parseText(raw) {
+    if (looksCSV(raw)) return parseCSV(raw);
     const lines = String(raw).replace(/\r\n?/g, "\n").replace(/^\uFEFF/, "").split("\n");
     const out = [];
     let cur = null, curDate = null, seq = 0;
@@ -84,5 +132,5 @@
     return { people: [A, B], messages: keep, others: all.length - keep.length };
   }
 
-  return { parseText, parseFiles, classify, naturalCompare };
+  return { parseText, parseFiles, parseCSV, looksCSV, classify, naturalCompare };
 });

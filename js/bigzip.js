@@ -71,7 +71,7 @@
 
   /* zip 속 txt 파일들 → [{name, text}] (사진·동영상 등은 건너뜀) */
   async function readTexts(file) {
-    const list = (await entries(file)).filter(x => /\.txt$/i.test(x.name) && !/(^|\/)(__MACOSX|\.)/.test(x.name) && !x.name.endsWith("/"));
+    const list = (await entries(file)).filter(x => /\.(txt|csv)$/i.test(x.name) && !/(^|\/)(__MACOSX|\.)/.test(x.name) && !x.name.endsWith("/"));
     const out = [];
     for (const en of list) out.push({ name: en.name, text: await readEntry(file, en) });
     return out;
