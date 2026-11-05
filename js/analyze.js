@@ -22,6 +22,7 @@
 
     /* ---------- overview ---------- */
     const byWho = zero(people), photos = zero(people), emoticons = zero(people), calls = zero(people), chars = zero(people), textCount = zero(people);
+    const laughBy = zero(people), dayLaugh = {}; // v18 친구: 사람별 ㅋㅋ/ㅎㅎ 말풍선, 날짜별 웃음
     let laugh = 0, cry = 0, callCount = 0, callSec = 0, lateNight = 0, firstCallInfo = null, longestCall = null;
     const daily = {}, monthly = {}, weekday = Array(7).fill(0), hourly = Array(24).fill(0);
     for (const m of messages) {
@@ -41,6 +42,7 @@
       if (m.type === "text") {
         chars[m.who] += m.text.length; textCount[m.who]++; monthly[mk].texts++;
         laugh += (m.text.match(/[ㅋㅎ]/g) || []).length; cry += (m.text.match(/[ㅠㅜ]/g) || []).length;
+        if (/[ㅋㅎ]{2,}/.test(m.text)) { laughBy[m.who]++; dayLaugh[dk] = (dayLaugh[dk] || 0) + 1; }
       }
     }
     const firstDay = U.dayKey(messages[0].t), lastDay = U.dayKey(messages[N - 1].t);
@@ -59,12 +61,14 @@
       chars, textCount, textTotal: texts.length, laugh, cry, longestStreak, longestStreakEnd, currentStreak: streak,
       missingDays: missing.length, missingList: missingList.slice(0, 5), lateNight, firstCallInfo, longestCall
     };
+    r.laughBy = laughBy;
     r.daily = daily; r.monthly = monthly; r.weekday = weekday; r.hourly = hourly;
     r.topDays = Object.entries(daily).sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([date, v]) => Object.assign({ date }, v));
 
     /* ---------- speed ---------- */
     const reply = {}; for (const p of people) reply[p] = [];
     const init = zero(people), enders = zero(people), doubles = zero(people);
+    const laughReact = zero(people); // v18: p의 말 바로 뒤(10분 안) 상대가 ㅋㅋ/ㅎㅎ로 반응한 횟수 = p가 웃긴 횟수
     const openers = {}; // v17: 사람별 '조용한 뒤 먼저 건넨 첫마디'(짝사랑 이야기용)
     const sessions = []; let sess = { start: 0, n: 0 };
     let longestSilence = { hours: 0 };
@@ -76,6 +80,7 @@
       sess.n++;
       if (prev && gap > longestSilence.hours * H) longestSilence = { hours: gap / H, from: U.dayKey(prev.t), to: U.dayKey(m.t), breaker: m.who };
       if (prev && prev.who === m.who && gap <= R.GAP_SESSION) doubles[m.who]++;
+      if (prev && prev.who !== m.who && gap <= 10 * MIN && m.type === "text" && /[ㅋㅎ]{2,}/.test(m.text) && prev.type !== "emoticon") laughReact[prev.who]++;
       if (prev && prev.who !== m.who && gap <= R.GAP_REPLY) {
         const mins = Math.round(gap / MIN); reply[m.who].push(mins);
         const mk = U.monthKey(m.t); (monthlyReplyRaw[mk] = monthlyReplyRaw[mk] || { [A]: [], [B]: [] })[m.who].push(mins);
@@ -88,6 +93,7 @@
       rs[p] = { n: a.length, mean: U.mean(a), median: U.median(a), in1: a.length ? a.filter(x => x <= 1).length / a.length : 0, in5: a.length ? a.filter(x => x <= 5).length / a.length : 0, in30: a.length ? a.filter(x => x <= 30).length / a.length : 0 };
     }
     const maxS = sessions.reduce((a, b) => b.n > a.n ? b : a, sessions[0]);
+    r.laughReact = laughReact;
     r.openers = Object.fromEntries(people.map(p => [p, (openers[p] || []).slice(-5)]));
     r.speed = {
       reply: rs, init, enders, doubles, sessions: sessions.length, avgSessionLen: N / sessions.length,
@@ -280,6 +286,7 @@
       firstLove: love.love.first ? around(love.love.first.i, 3) : null,
       firstMiss: love.miss.first ? around(love.miss.first.i, 3) : null,
       peakDay: r.topDays[0] ? pickScene(r.topDays[0].date, WARM) : null,
+      laughDay: (() => { const k = Object.keys(dayLaugh).sort((a, b) => dayLaugh[b] - dayLaugh[a])[0]; if (!k) return null; const sc = pickScene(k, /[ㅋㅎ]{2,}/); return sc ? Object.assign(sc, { n: dayLaugh[k] }) : null; })(),
       latest: { date: lastDay, lines: sceneOf(messages, N - 9, N) },
       longestScene: { date: r.speed.maxSession.date, lines: sceneOf(messages, maxS.start, maxS.start + 9) }
     };

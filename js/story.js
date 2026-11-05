@@ -52,7 +52,7 @@
     const rhythm = [];
     if (rt && rt.ok) rhythm.push(`카톡으로 보면 ${p}의 하루는 보통 ${hm(rt.wake.med)}쯤 시작해서 ${hm(rt.sleep.med)}쯤 끝났어요.`);
     const lg = r.loveLang && r.loveLang[p], LBL = { words: "칭찬과 고마움 같은 말", time: "함께하는 시간", gift: "작은 선물", service: "챙겨 주는 행동", touch: "스킨십" };
-    if (lg) rhythm.push(`사랑을 표현하는 방식은 주로 ${LBL[lg.top]}이었어요${lg.cats.find(c => c.key === lg.top).examples[0] ? `. "${lg.cats.find(c => c.key === lg.top).examples[0].text}" 같은 말처럼요` : ""}.`.replace("말이었어요", "말이었어요").replace(/(시간|선물|행동|스킨십)이었어요/, (m, w) => w + (U.jong(w) ? "이었어요" : "였어요")));
+    if (lg) rhythm.push(`${cp && cp.friend ? "마음을" : "사랑을"} 표현하는 방식은 주로 ${LBL[lg.top]}이었어요${lg.cats.find(c => c.key === lg.top).examples[0] ? `. "${lg.cats.find(c => c.key === lg.top).examples[0].text}" 같은 말처럼요` : ""}.`.replace("말이었어요", "말이었어요").replace(/(시간|선물|행동|스킨십)이었어요/, (m, w) => w + (U.jong(w) ? "이었어요" : "였어요")));
     const mb = cp && cp.mbti && cp.mbti.by[p];
     if (mb) rhythm.push(mb.same >= 3 ? `스스로를 ${mb.real}라고 소개하는 사람인데, 대화를 읽어 보면 정말 그래요.` : `스스로는 ${mb.real}라고 하지만, 대화 속에서는 조금 다른 얼굴도 보여요.${mb.axes.filter(x => !x.match).length ? " 사랑하는 사람 앞에서는 누구나 조금씩 달라지니까요." : ""}`);
     if (food) rhythm.push(`가장 자주 꺼낸 음식 이야기는 ${yeotda(food.label)}(${num(food.by[p])}번).`);

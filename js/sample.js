@@ -126,5 +126,35 @@
     return lines.join("\n");
   }
 
-  return { make, makeCrush };
+
+  /* 친구 샘플(v18) — 가상의 두 사람: 김하준, 정민서. 1년, ㅋㅋ 많음, 시험·게임·맛집·약속. */
+  function makeFriend() {
+    const R = rng(20251001), pick = a => a[Math.floor(R() * a.length)], chance = p => R() < p;
+    const A = "김하준", B = "정민서";
+    const lines = ["정민서 님과 카카오톡 대화", "저장한 날짜 : 2026. 11. 1. 오후 10:00", ""];
+    const start = new Date(2025, 9, 3), end = new Date(2026, 9, 31);
+    const fmt = (d, who, text) => `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${d.getHours() < 12 ? "오전" : "오후"} ${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${String(d.getMinutes()).padStart(2, "0")}, ${who} : ${text}`;
+    let n = 0;
+    const FOOD = ["마라탕", "떡볶이", "치킨", "국밥", "햄버거", "초밥", "삼겹살"];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), n++) {
+      const late = n > 300;
+      if (!chance(late ? 0.35 : 0.55)) continue;
+      let t = new Date(d); t.setHours(13 + Math.floor(R() * 9), Math.floor(R() * 60), 0, 0);
+      const out = [], say = (who, text, gap) => { t = new Date(t.getTime() + (gap == null ? 1 + Math.floor(R() * 5) : gap) * 60000); out.push(fmt(t, who, text)); };
+      const a = chance(0.62) ? A : B, b = a === A ? B : A;
+      say(a, pick(["야", "뭐해", "ㅋㅋㅋㅋ 이거 봐", "오늘 시험 망함", "겜 ㄱ?", "배고프다", "나 오늘 진짜 웃긴 일 있었음"]), 0);
+      say(b, pick(["ㅋㅋㅋㅋㅋ 뭔데", "왜", "ㄱㄱ", "ㅋㅋㅋ 나도", "헐 괜찮아?", "ㅋㅋㅋㅋ 미쳤다"]));
+      const k = 4 + Math.floor(R() * 14);
+      for (let i = 0; i < k; i++) {
+        const who = chance(0.53) ? A : B;
+        say(who, pick(["ㅋㅋㅋㅋㅋㅋ", "ㄹㅇ", "아 진짜 웃기네 ㅋㅋ", "인정", "그거 완전 너잖아 ㅋㅋㅋ", "오늘 과제 언제 끝나냐", "팀플 개힘듦", "시험 잘 봐!", "고마워 ㅋㅋ", "ㅋㅋㅋ 뭐래", "아 졸려", "나 오늘 늦잠 잠", `오늘 ${pick(FOOD)} 먹음`, `${pick(FOOD)} 먹으러 가자`, "주말에 만날래?", "ㅇㅋ", "그건 좀 ㅋㅋ", "ㅎㅎ", "웅", "이따 전화할게", "엄마가 너 안부 묻더라", "ㅋㅋㅋ 개웃겨"]), chance(0.1) ? 20 + Math.floor(R() * 40) : null);
+      }
+      if (chance(0.05)) say(pick([A, B]), `보이스톡 ${String(3 + Math.floor(R() * 40)).padStart(2, "0")}:${String(Math.floor(R() * 60)).padStart(2, "0")}`, 15);
+      if (n === 200) { say(B, "생일 축하해!! 🎂", 0); say(A, "ㅋㅋㅋ 고마워 역시 너밖에 없다"); }
+      lines.push(...out);
+    }
+    return lines.join("\n");
+  }
+
+  return { make, makeCrush, makeFriend };
 });
