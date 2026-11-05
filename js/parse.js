@@ -38,7 +38,11 @@
   const RE_CSV_ROW = /^\uFEFF?"?\d{4}[-./]\s*\d{1,2}[-./]\s*\d{1,2}\.?\s+(오전|오후)?\s*\d{1,2}:\d{2}(:\d{2})?"?\s*[,\t]/;
   function looksCSV(raw) {
     const first = String(raw).replace(/^\uFEFF/, "").split(/\r?\n/).find(l => l.trim()) || "";
-    return RE_CSV_HEAD.test(first) || RE_CSV_ROW.test(first);
+    if (RE_CSV_HEAD.test(first)) return true;
+    // 머리줄 없는 CSV는 '날짜,보낸 사람,메시지'처럼 쉼표로 나뉜 칸이어야 한다.
+    // 카톡 txt 줄("2024. 12. 6. 오후 8:32, 이름 : 메시지")은 절대 CSV로 보지 않는다 (v16.1 버그 수정)
+    if (RE_AND.test(first) || RE_IOS.test(first) || /^\uFEFF?\d{4}.{0,30}?,\s*[^,"]+?\s:\s/.test(first)) return false;
+    return RE_CSV_ROW.test(first) && /^\uFEFF?"?[^,\t]+"?\s*[,\t]\s*"[^"]*"\s*[,\t]/.test(first);
   }
   function csvRows(text, delim) {
     const rows = []; let row = [], f = "", q = false;
