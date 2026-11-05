@@ -382,6 +382,37 @@ details.more[open] > summary::after { content: "접기"; }
 details.more[open] { padding-bottom: 16px; background: transparent; padding-left: 0; padding-right: 0; }
 details.more[open] > summary { background: var(--surface); border-radius: var(--r); padding: 16px; }
 
+/* v13: 안전 */
+.trust { display: grid; grid-template-columns: 52px 1fr; gap: 14px; align-items: start; text-align: left; text-decoration: none; color: var(--fg); background: #eaf7ee; border: 1.5px solid #bfe6cb; border-radius: var(--r); padding: 16px; }
+.trust-ico { width: 52px; height: 52px; border-radius: 16px; background: var(--good); color: #fff; display: grid; place-items: center; }
+.trust-ico .ico { width: 30px; height: 30px; stroke-width: 2; }
+.trust-body { display: grid; gap: 4px; }
+.trust-body > b { font-size: 19px; letter-spacing: -0.02em; color: #1d6b35; }
+.trust-body > span { font-size: 15px; line-height: 1.45; color: #2f5a3d; }
+.trust-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.trust-chips i { font-style: normal; font-size: 13px; font-weight: 600; color: #1d6b35; background: #fff; border-radius: 99px; padding: 3px 10px; }
+.trust-body .trust-more { font-size: 14px; font-weight: 700; color: var(--good); margin-top: 2px; }
+.trust.compact { grid-template-columns: 40px 1fr; padding: 12px 14px; }
+.trust.compact .trust-ico { width: 40px; height: 40px; border-radius: 12px; } .trust.compact .trust-ico .ico { width: 22px; height: 22px; }
+.trust.compact .trust-body > b { font-size: 16px; } .trust.compact .trust-body > span { font-size: 14px; }
+.flow { display: grid; gap: 6px; justify-items: center; background: var(--surface); border-radius: var(--r); padding: 18px 16px; }
+.fbox { width: 100%; text-align: center; padding: 12px; border-radius: 12px; background: var(--fill); font-weight: 600; font-size: 15px; }
+.fbox.on { background: #eaf7ee; color: #1d6b35; border: 1.5px solid #bfe6cb; display: grid; gap: 2px; justify-items: center; }
+.fbox.on .ico { width: 20px; height: 20px; color: var(--good); }
+.fbox small { font-weight: 500; font-size: 13px; color: #2f5a3d; }
+.farrow { color: var(--muted); font-size: 18px; line-height: 1; }
+.fno { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+.fno s { font-size: 14px; color: var(--bad); background: #fdecea; border-radius: 99px; padding: 3px 10px; text-decoration-thickness: 2px; }
+.fno span { width: 100%; text-align: center; font-size: 13px; color: var(--muted); }
+.sl { display: grid; gap: 16px; }
+.srow { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; }
+.srow .sb { width: 36px; height: 36px; border-radius: 11px; background: #eaf7ee; color: var(--good); display: grid; place-items: center; }
+.srow .sb .ico { width: 20px; height: 20px; stroke-width: 2.1; }
+.srow > div { display: grid; gap: 3px; }
+.srow b { font-size: 16px; } .srow p { font-size: 15px; line-height: 1.5; color: var(--muted); }
+.nt { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; margin-top: 8px; color: var(--muted) !important; }
+.nt.ok { color: var(--good) !important; } .nt.warn { color: var(--warn) !important; }
+.nt .ico { width: 18px; height: 18px; stroke-width: 2.4; }
 /* 웹앱 설치 안내 */
 .install { padding: 16px; display: grid; gap: 8px; border: 1.5px solid var(--p-us); }
 .install-h { display: flex; justify-content: space-between; align-items: center; }
@@ -441,7 +472,7 @@ details.more[open] > summary { background: var(--surface); border-radius: var(--
   <a href="#advice" data-nav="advice"></a>
 </div></nav>
 <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" multiple hidden>
-<div class="loading" id="loading" hidden role="status" aria-live="polite"><div><div class="spinner"></div><p id="loading-text">대화를 읽고 있어요</p><p class="lockline" style="margin-top:10px">이 기기 안에서만 분석하고 있어요</p></div></div>
+<div class="loading" id="loading" hidden role="status" aria-live="polite"><div><div class="spinner"></div><p id="loading-text">대화를 읽고 있어요</p><p class="lockline" style="margin-top:10px">어디에도 보내지 않고, 이 기기 안에서만 읽고 있어요</p></div></div>
 <div class="tip" id="tip" hidden></div>
 
 <script src="vendor/jszip.min.js"></script>

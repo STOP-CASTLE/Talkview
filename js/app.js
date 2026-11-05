@@ -45,7 +45,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     balance: ["관계의 균형", "scale", "누가 더 챙겨 줄까?"], life: ["일상 이야기", "cup", "우리는 무슨 이야기를 할까?"],
     mbti: ["MBTI", "people", "우리는 어떤 사람일까?"], conflict: ["싸움과 화해", "cloud", "싸우면 어떻게 화해할까?"]
   };
-  const TOP = { home: "홈", story: "사랑 이야기", analysis: "분석", advice: "더 사랑하려면", info: "우리 정보" };
+  const TOP = { home: "홈", story: "사랑 이야기", analysis: "분석", advice: "더 사랑하려면", info: "우리 정보", safe: "안전한 이유" };
   const NAV = [["home", "홈", "home"], ["story", "이야기", "book"], ["analysis", "분석", "grid"], ["advice", "조언", "sparkle"]];
   let state = null, route = "home", depth = 0;
 
@@ -134,13 +134,13 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   function render() {
     const h = location.hash.slice(1);
     route = (h in TOP || h in DETAIL) ? h : "home";
-    if (!state) route = "home";
+    if (!state && route !== "safe") route = "home";
     const inDetail = route in DETAIL;
     const title = !state ? "" : inDetail ? DETAIL[route][0] : TOP[route];
     $("#appbar").classList.toggle("solid", inDetail);
-    $("#bar").innerHTML = route === "info" ? `<span></span><span class="mini">${e(title)}</span><span></span>` : (inDetail ? `<button class="backbtn" type="button" data-act="back">${ico("back")}분석</button>` : `<span></span>`)
+    $("#bar").innerHTML = route === "safe" ? `<button class="backbtn" type="button" data-act="back">${ico("back")}돌아가기</button><span class="mini">${e(title)}</span><span></span>` : route === "info" ? `<span></span><span class="mini">${e(title)}</span><span></span>` : (inDetail ? `<button class="backbtn" type="button" data-act="back">${ico("back")}분석</button>` : `<span></span>`)
       + `<span class="mini">${e(title)}</span><span></span>`;
-    const nav = $("#nav"); nav.hidden = !state || route === "info";
+    const nav = $("#nav"); nav.hidden = !state || route === "info" || route === "safe";
     const cur = inDetail ? "analysis" : route;
     nav.querySelectorAll("a").forEach((a, i) => {
       const [id, label, icon] = NAV[i];
@@ -148,7 +148,8 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       if (id === cur) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     let html;
-    if (!state) html = landing();
+    if (route === "safe") html = safePage();
+    else if (!state) html = landing();
     else if (route === "info") html = infoForm();
     else if (route === "home") html = `<header><p class="hello-name">${state.couple && state.couple.since ? `${U.fmtDate(state.couple.since.month)}에 연인이 된` : `${U.fmtDate(state.r.overview.first)}부터 함께한`}</p><h1 class="large">${e(state.r.A)} <span style="color:var(--accent)">♥</span> ${e(state.r.B)}</h1></header>` + home();
     else if (route === "analysis") html = largeTitle("분석", "궁금한 질문을 눌러 자세히 볼 수 있어요") + analysisList();
@@ -200,6 +201,49 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   let guideTab = MOBILE ? "phone" : "pc";
   const stepsHtml = () => STEPS[guideTab].map(([t, n], i) => `<div class="row noicon"><span class="step-n">${i + 1}</span><div class="body step-t">${t}${n ? `<small>${n}</small>` : ""}</div></div>`).join("");
   const brand = () => `<div style="padding-top:12px"><h1 class="brand-name">TALK VIEW</h1><p class="brand-tag">우리의 모든 순간을 사랑으로 기억하다.</p></div>`;
+  /* ---------- 안전 (v13): 말이 아니라 직접 확인할 수 있는 근거로 ---------- */
+  const LOCKED = IN_APP || PWA; // 통신 차단이 실제로 걸린 판(앱: 인터넷 권한 없음 / 웹앱: CSP)
+  const CODE_URL = "https://github.com/STOP-CASTLE/Talkview";
+  function trustCard(compact) {
+    return `<a class="trust${compact ? " compact" : ""}" href="#safe" data-go="safe">
+      <span class="trust-ico">${ico("shield")}</span>
+      <span class="trust-body"><b>개발자도, 누구도 볼 수 없어요</b><span>대화를 받을 서버가 없어요. 이 휴대폰 안에서만 읽어요.</span>${compact ? "" : `<span class="trust-chips"><i>서버 없음</i><i>업로드 없음</i><i>${LOCKED ? "통신 차단" : "기기 안에서만"}</i></span>`}<span class="trust-more">왜 안전한지 직접 확인하기 ›</span></span></a>`;
+  }
+  let netTest = null; // null: 안 함, "run", "blocked", "open"
+  async function runNetTest() {
+    netTest = "run"; render();
+    try { await fetch("https://example.com/talkview-check", { mode: "no-cors", cache: "no-store" }); netTest = "open"; }
+    catch (_) { netTest = "blocked"; }
+    render();
+  }
+  function safePage() {
+    const row = (icon, t, d) => `<div class="srow"><span class="sb">${ico(icon)}</span><div><b>${t}</b><p>${d}</p></div></div>`;
+    const testRes = netTest === "blocked" ? `<p class="nt ok">${ico("check")}차단됐어요. 이 화면은 바깥 인터넷 어디에도 연결할 수 없어요.</p>`
+      : netTest === "open" ? `<p class="nt warn">이 화면(미리보기)에서는 연결이 막혀 있지 않았어요. 앱이나 웹앱에서 다시 눌러 보세요.</p>`
+        : netTest === "run" ? `<p class="nt">확인하는 중…</p>` : "";
+    return `<header><h1 class="large" style="font-size:30px">대화는 이 휴대폰을<br>벗어나지 않아요</h1><p class="large-sub">말로만 하는 약속이 아니라, 직접 확인할 수 있게 적어 둘게요.</p></header>
+      <div class="panel">
+        <section class="flow" aria-label="대화가 지나가는 길">
+          <div class="fbox">카톡 대화 파일</div><div class="farrow">↓</div>
+          <div class="fbox on">${ico("lock")}이 휴대폰 안의 TALK VIEW<small>여기서 읽고, 세고, 이야기를 써요</small></div><div class="farrow">↓</div>
+          <div class="fbox">결과 화면 (이 휴대폰에만 저장)</div>
+          <div class="fno"><s>서버</s><s>개발자</s><s>AI 회사</s><span>어디에도 보내지 않아요</span></div>
+        </section>
+        <section class="sec"><p class="head">개발자도 볼 수 없는 이유</p><div class="group pad sl">
+          ${row("lock", "대화를 받을 서버가 없어요", "TALK VIEW는 화면 파일만 있는 앱이에요. 대화를 보낼 곳이 처음부터 없어서, 개발자에게 도착할 수도 없어요.")}
+          ${row("shield", "보내는 기능이 아예 없어요", IN_APP ? "이 안드로이드 앱은 인터넷 권한 자체가 없어요. 휴대폰 설정 → 애플리케이션 → TALK VIEW → 권한에서 직접 볼 수 있어요." : PWA ? "이 웹앱에는 바깥과 통신하지 못하게 막는 보안 설정(CSP)이 걸려 있어요. 아래 버튼으로 직접 확인할 수 있어요." : "대화를 어딘가로 보내는 코드가 없어요. 앱이나 웹앱에서는 통신 자체를 막는 설정도 걸려 있어요.")}
+          ${row("people", "AI에게 보내지 않아요", "분석은 이 앱 안에 들어 있는 규칙(낱말 세기, 시간 계산)으로만 해요. ChatGPT나 Claude 같은 AI 서버에 대화를 보내지 않아요.")}
+          ${row("trash", "결과는 이 휴대폰에만, 지우면 끝", "대화 원문은 저장하지 않아요. 분석 결과와 장면 몇 줄만 이 휴대폰에 남고, '이 기기 기록 지우기'를 누르면 바로 사라져요.")}
+          ${row("eye", "다른 사람 이름은 가려요", "대화에 나온 다른 사람의 이름(○○씨)은 자동으로 바꿔서 보여 줘요.")}
+        </div></section>
+        <section class="sec"><p class="head">직접 확인해 보세요</p><div class="group pad sl">
+          ${row("cloud", "1. 비행기 모드로 써 보기", `비행기 모드를 켜고 대화를 불러와 보세요. 인터넷이 없어도 분석이 끝까지 돼요. 인터넷이 필요 없다는 건, 어디로도 보내지 않는다는 뜻이에요.${PWA ? " (웹앱은 한 번 열어 둔 뒤에 해 보세요.)" : ""}`)}
+          <div class="srow"><span class="sb">${ico("bolt")}</span><div><b>2. 통신 차단 확인하기</b><p>버튼을 누르면 이 화면이 바깥 인터넷에 연결을 시도해 보고, 막혔는지 보여 줘요. 아무 내용도 보내지 않아요.</p><button class="btn primary small" type="button" data-act="nettest" style="margin-top:8px;justify-self:start">지금 확인하기</button>${testRes}</div></div>
+          ${row("book", "3. 코드는 공개돼 있어요", `TALK VIEW의 코드는 누구나 볼 수 있게 공개돼 있어요. 개발자를 아는 사람에게 확인을 부탁해도 좋아요.<br><a href="${CODE_URL}" target="_blank" rel="noopener noreferrer" style="color:var(--tint);font-weight:600">github.com/STOP-CASTLE/Talkview</a>`)}
+        </div></section>
+        ${state && !state.isSample ? `<button class="btn danger block" type="button" data-act="forget" style="margin-top:4px">이 기기에 저장된 결과 지금 지우기</button>` : ""}
+      </div>`;
+  }
   function secureBox() {
     const it = (icon, t) => `<div class="sitem">${ico(icon)}<b>${t}</b></div>`;
     return `<section class="group secure"><h3>${ico("shield")}대화는 안전하게 지켜져요</h3>
@@ -219,8 +263,8 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       return `<section class="welcome" style="gap:24px">${brand()}
         <p class="pick-q">누구와 나눈 대화인가요?</p>
         <div class="picks">${RELS.map(([id, label, icon, c, pc, d]) => `<button class="pick" type="button" data-rel="${id}"><span class="badge" style="background:var(${pc});color:var(${c})">${ico(icon)}</span><b>${label}${id === "love" ? "" : ` <span class="soon">준비 중</span>`}</b><span>${d}</span></button>`).join("")}</div>
-        <p class="lockline">${ico("lock")}대화는 서버로 보내지 않고, 이 기기 안에서만 분석해요</p>
-      </section>${installHint()}${secureBox()}`;
+        ${trustCard()}
+      </section>${installHint()}`;
     }
     if (rel !== "love") {
       const r = RELS.find(x => x[0] === rel);
@@ -235,7 +279,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       <div class="cta"><label class="btn primary block" for="file">카톡 대화 불러오기</label>
         <button class="btn plain" type="button" data-act="sample">샘플로 먼저 둘러보기</button>
         <button class="chip-back" type="button" data-rel="" style="margin-top:4px">연인 · 관계 다시 고르기</button></div>
-      <p class="lockline">${ico("lock")}서버에 저장하지 않아요 · 개발자도 볼 수 없어요</p>
+      ${trustCard(true)}
       <p class="status" id="status" role="status" aria-live="polite">${MOBILE ? "" : "파일을 이 화면에 끌어다 놓아도 돼요."}</p>
     </section>
     <section class="sec">
@@ -244,7 +288,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       <div class="group" id="steps">${stepsHtml()}</div>
       ${MOBILE ? `<a class="btn kakao block" href="kakaotalk://launch" data-act="kakao">카카오톡 열어서 대화 내보내기</a>
       <p class="foot" style="text-align:center">${IN_APP ? "내보내기 화면의 공유 목록에서 TALK VIEW를 누르면 바로 분석돼요." : "내보낸 파일을 저장한 뒤, 여기로 돌아와 불러오면 돼요."}</p>` : ""}
-    </section>${secureBox()}`;
+    </section>`;
   }
 
   /* ---------- 우리 정보 (사귄 날·MBTI) v10 ---------- */
@@ -341,7 +385,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       <a class="row noicon" href="#info" data-go="info" style="color:var(--tint);font-weight:600;text-decoration:none">우리 정보 ${state.info ? "고치기" : "알려 주기"} <span class="cap" style="font-weight:400;margin-left:6px">사귄 날 · MBTI</span></a>
       <label class="row noicon" for="file" style="color:var(--tint);cursor:pointer;font-weight:600">새 대화 불러오기</label>
       ${state.isSample ? "" : `<button class="row noicon btn danger" type="button" data-act="forget" style="width:100%;background:none;border-radius:0;justify-content:flex-start;font-weight:400">이 기기에 저장된 결과 지우기</button>`}
-    </div><p class="lockline" style="padding-top:4px">${ico("lock")}서버 저장 없음 · 이 기기에만 저장돼요 · 개발자도 볼 수 없어요</p><p class="status" id="status" role="status" aria-live="polite"></p></section>`;
+    </div>${trustCard(true)}<p class="status" id="status" role="status" aria-live="polite"></p></section>`;
     return h;
   }
 
@@ -705,6 +749,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (act === "back") back();
     else if (act === "sample") sample();
     else if (act === "hide-install") { hideInstall = true; render(); }
+    else if (act === "nettest") runNetTest();
     else if (act === "info-save") { const d = readInfoForm(); infoDraft = null; applyInfo({ since: d.since || null, me: d.me || null, mbti: d.mbti || {} }); go("home", true); }
     else if (act === "info-skip") { infoDraft = null; if (!state.info) { state.couple = Couple.make(state.r, {}); } go("home", true); }
     else if (act === "kakao" && !IN_APP) { setTimeout(() => flash("카카오톡이 열리지 않으면 직접 카카오톡을 열어 주세요."), 1500); }
