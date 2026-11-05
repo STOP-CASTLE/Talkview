@@ -51,14 +51,20 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     // 친구(v18)
     fbond: ["우정 지수", "people", "우리 우정은 몇 점일까?"], flaugh: ["웃음", "sparkle", "누가 더 웃길까?"],
     ftalk: ["대화", "chat", "우리 얼마나 자주 이야기할까?"], freply: ["답장", "bolt", "누가 더 빨리 답할까?"],
-    fcare: ["챙김", "heart", "누가 더 챙겨 줄까?"], ftopic: ["이야기", "cup", "우리는 무슨 이야기를 할까?"]
+    fcare: ["챙김", "heart", "누가 더 챙겨 줄까?"], ftopic: ["이야기", "cup", "우리는 무슨 이야기를 할까?"],
+    // 친구 단톡방(v19)
+    gbond: ["우정 지수", "people", "우리 우정은 몇 점일까?"], gshare: ["말 지분", "chat", "누가 제일 말이 많을까?"],
+    glaugh: ["분위기 메이커", "sparkle", "이 방의 분위기 메이커는?"], gfirst: ["먼저 말 걸기", "bolt", "누가 먼저 말을 걸까?"],
+    gpair: ["단짝", "heart", "이 방의 단짝은?"], gcare: ["챙김", "cup", "누가 제일 잘 챙길까?"]
   };
   const FR_IDS = ["fbond", "flaugh", "ftalk", "freply", "fcare", "ftopic"];
+  const GR_IDS = ["gbond", "gshare", "glaugh", "gfirst", "gpair", "gcare"];
   const CR_IDS = ["sig", "first", "reply", "curious", "heart", "trend"];
   const CRUSH = () => !!(state && state.rel === "crush");
   const FRIEND = () => !!(state && state.rel === "friend");
-  const topTitle = t => t === "story" ? (CRUSH() ? "마음 이야기" : FRIEND() ? "우정 이야기" : TOP[t]) : t === "advice" ? (CRUSH() ? "다가가려면" : FRIEND() ? "더 친해지려면" : TOP[t]) : TOP[t];
-  const modeIds = () => CRUSH() ? CR_IDS : FRIEND() ? FR_IDS : null;
+  const GROUP = () => FRIEND() && !!state.group;
+  const topTitle = t => t === "story" ? (CRUSH() ? "마음 이야기" : GROUP() ? "우리들의 이야기" : FRIEND() ? "우정 이야기" : TOP[t]) : t === "advice" ? (CRUSH() ? "다가가려면" : FRIEND() ? "더 친해지려면" : TOP[t]) : TOP[t];
+  const modeIds = () => CRUSH() ? CR_IDS : GROUP() ? GR_IDS : FRIEND() ? FR_IDS : null;
   const TOP = { home: "홈", story: "사랑 이야기", analysis: "분석", advice: "더 사랑하려면", info: "우리 정보", safe: "안전한 이유" };
   const NAV = [["home", "홈", "home"], ["story", "이야기", "book"], ["analysis", "분석", "grid"], ["advice", "조언", "sparkle"]];
   let state = null, route = "home", depth = 0, lastRoute = null;
@@ -66,11 +72,12 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   /* ---------- 분석 실행 ---------- */
   function compute(files, isSample) {
     const parsed = Parse.parseFiles(files);
+    const gmem = rel === "friend" && window.Group ? Group.members(parsed.counts || {}) : [];
     if (parsed.people.length < 2 || parsed.messages.length < 20) throw new Error("두 사람의 대화를 찾지 못했어요. 카카오톡 '대화 내보내기'로 만든 txt 파일인지 확인해 주세요.");
     const d = ANONYMIZE ? Anon.anonymize(parsed, { keepCouple: SHOW_NAMES }) : parsed;
     const r = Analyze.analyze(d.messages, d.people);
     const adv = Advice.advice(r);
-    return { r, adv, sum: Summary.summary(r, adv), story: Story.story(r), isSample, others: parsed.others, savedAt: Date.now(), info: null, couple: null, rel: rel === "crush" || rel === "friend" ? rel : "love", crush: null, friend: rel === "friend" ? Friend.make(r, {}) : null };
+    return { r, adv, sum: Summary.summary(r, adv), story: Story.story(r), isSample, others: parsed.others, savedAt: Date.now(), info: null, couple: null, rel: rel === "crush" || rel === "friend" ? rel : "love", crush: null, friend: rel === "friend" ? Friend.make(r, {}) : null, group: gmem.length >= 3 ? Group.analyze(parsed.all, gmem, parsed.title) : null };
   }
   // 사용자가 알려 준 정보(사귄 날·MBTI)를 반영해 다시 계산 (v10)
   // 두 사람 이름 바꾸기 (v16): 결과 객체 안의 이름 키·값을 통째로 바꾸고 조언·요약을 다시 만든다.
@@ -83,6 +90,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     };
     if (!state.origNames) state.origNames = [state.r.A, state.r.B];
     state.r = walk(state.r);
+    if (state.group) state.group = walk(state.group);
     state.adv = Advice.advice(state.r);
     state.sum = Summary.summary(state.r, state.adv);
   }
@@ -90,7 +98,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   function applyInfo(info) {
     state.info = info;
     if (CRUSH()) { state.crush = Crush.make(state.r, info.me, { likeSince: info.since }); save(); return; }
-    if (FRIEND()) { state.friend = Friend.make(state.r, { since: info.since, me: info.me }); save(); return; }
+    if (FRIEND()) { state.friend = Friend.make(state.r, { since: info.since, me: info.me }); if (state.group) state.gstory = Group.story(state.group, info); save(); return; }
     state.couple = Couple.make(state.r, info);
     state.story = Story.story(state.r, state.couple);
     save();
@@ -157,6 +165,13 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       setTimeout(() => flash(err.message || String(err), true), 0);
     }
   }
+  async function sampleGroup() {
+    loading(true, "샘플 단톡방을 불러오고 있어요");
+    await new Promise(r => setTimeout(r, 60));
+    state = compute([{ name: "group.txt", text: Sample.makeGroup() }], true);
+    state.gstory = Group.story(state.group, {});
+    loading(false); go("info", true);
+  }
   async function sample() {
     loading(true, "샘플 대화를 불러오고 있어요");
     await new Promise(r => setTimeout(r, 60));
@@ -180,7 +195,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const h = location.hash.slice(1);
     route = (h in TOP || h in DETAIL) ? h : "home";
     if (!state && route !== "safe") route = "home";
-    if (state && route in DETAIL) { const ids = modeIds(); if (ids ? !ids.includes(route) : (CR_IDS.includes(route) || FR_IDS.includes(route))) route = "analysis"; } // 관계별 화면 섞이지 않게
+    if (state && route in DETAIL) { const ids = modeIds(); if (ids ? !ids.includes(route) : (CR_IDS.includes(route) || FR_IDS.includes(route) || GR_IDS.includes(route))) route = "analysis"; } // 관계별 화면 섞이지 않게
     if (state && CRUSH() && !state.crush && route !== "info" && route !== "safe") route = "info"; // 짝사랑은 '나'부터
     document.documentElement.dataset.mode = (state ? state.rel : rel) || ""; // 친구는 파란색(v18.1)
     const inDetail = route in DETAIL;
@@ -199,14 +214,15 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (route === "safe") html = safePage();
     else if (!state) html = landing();
     else if (route === "info") html = infoForm();
+    else if (route === "home" && GROUP()) html = `<header><p class="hello-name">${state.info && state.info.since ? `${U.fmtDate(state.info.since)}부터 이어진` : `${U.fmtDate(state.group.first)}부터 이어진`}</p><h1 class="large">${e(state.group.title || `우리 ${state.group.people.length}명`)}</h1><div class="gchips">${state.group.people.slice(0, 12).map((p, i) => `<span style="--gc:${gcol(i)}">${e(p.name)}</span>`).join("")}${state.group.people.length > 12 ? `<span>+${state.group.people.length - 12}</span>` : ""}</div></header>` + homeGroup();
     else if (route === "home" && FRIEND()) html = `<header><p class="hello-name">${state.info && state.info.since ? `${U.fmtDate(state.info.since)}부터 친구인` : `${U.fmtDate(state.r.overview.first)}부터 이어진`}</p><h1 class="large">${e(A())} <span style="color:var(--accent)">&amp;</span> ${e(B())}</h1></header>` + homeFriend();
     else if (route === "home" && CRUSH()) html = `<header><p class="hello-name">${U.fmtDate(state.r.overview.first)}부터 이어진</p><h1 class="large">${e(state.crush.me)}의 마음,<br><span style="color:var(--accent)">${e(state.crush.them)}</span>에게</h1></header>` + homeCrush();
     else if (route === "home") html = `<header><p class="hello-name">${state.couple && state.couple.since ? `${U.fmtDate(state.couple.since.month)}에 연인이 된` : `${U.fmtDate(state.r.overview.first)}부터 함께한`}</p><h1 class="large">${e(state.r.A)} <span style="color:var(--accent)">♥</span> ${e(state.r.B)}</h1></header>` + home();
-    else if (route === "analysis") html = largeTitle("분석", "궁금한 질문을 눌러 자세히 볼 수 있어요") + (CRUSH() ? crushList() : FRIEND() ? friendList() : analysisList());
+    else if (route === "analysis") html = largeTitle("분석", "궁금한 질문을 눌러 자세히 볼 수 있어요") + (CRUSH() ? crushList() : GROUP() ? groupList() : FRIEND() ? friendList() : analysisList());
     else if (route === "story") html = `<div class="panel">${RENDER.story()}</div>`;
-    else if (route === "advice") html = largeTitle(topTitle("advice")) + `<div class="panel">${CRUSH() ? RENDER.crushAdvice() : FRIEND() ? RENDER.friendAdvice() : RENDER.advice()}</div>`;
+    else if (route === "advice") html = largeTitle(topTitle("advice")) + `<div class="panel">${CRUSH() ? RENDER.crushAdvice() : GROUP() ? RENDER.groupAdvice() : FRIEND() ? RENDER.friendAdvice() : RENDER.advice()}</div>`;
     else {
-      const cd = (CRUSH() ? crushCards() : FRIEND() ? friendCards() : cards()).find(x => x[0] === route);
+      const cd = (CRUSH() ? crushCards() : GROUP() ? groupCards() : FRIEND() ? friendCards() : cards()).find(x => x[0] === route);
       CAP = {}; const body = RENDER[route](); const cap = CAP; CAP = null;
       const ins = (INSIGHTS[route] ? INSIGHTS[route]() : []).filter(Boolean);
       if (CRUSH()) ins.forEach(x => { if (x.versus && x.focus == null) x.focus = 1; }); // 짝사랑: 늘 '그 사람'(또는 '최근') 쪽을 진하게
@@ -214,7 +230,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
         <div class="panel">${cap.read || ""}
           ${ins.length ? `<section class="insights">${ins.map(x => insightCard(x, route)).join("")}</section>` : ""}
           ${cap.concl || ""}
-          <details class="more"${route === "flaugh" ? " open" : ""}><summary>${route === "flaugh" ? "그날의 대화 다시 읽기" : "숫자와 그래프로 자세히 보기"}</summary><div class="panel" style="padding-top:16px">${body}</div></details>
+          <details class="more"${route === "flaugh" || route === "glaugh" ? " open" : ""}><summary>${route === "flaugh" || route === "glaugh" ? "그날의 대화 다시 읽기" : "숫자와 그래프로 자세히 보기"}</summary><div class="panel" style="padding-top:16px">${body}</div></details>
         </div>`;
     }
     $("#main").innerHTML = `<div class="view">${html}</div>`;
@@ -327,9 +343,10 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
           <button class="chip-back" type="button" data-rel="">관계 다시 고르기</button></div></section>`;
     }
     return `<section class="welcome" style="gap:22px">${brand()}
-      ${rel === "crush" ? `<p class="pick-q" style="font-size:19px;line-height:1.5">그 사람과 나눈 카톡으로<br>마음이 얼마나 닿았는지 볼게요</p>` : rel === "friend" ? `<p class="pick-q" style="font-size:19px;line-height:1.5">친구와 나눈 카톡으로<br>우리 우정을 돌아볼게요</p>` : ""}
+      ${rel === "crush" ? `<p class="pick-q" style="font-size:19px;line-height:1.5">그 사람과 나눈 카톡으로<br>마음이 얼마나 닿았는지 볼게요</p>` : rel === "friend" ? `<p class="pick-q" style="font-size:19px;line-height:1.5">친구와 나눈 카톡으로<br>우리 우정을 돌아볼게요</p><p class="cap" style="text-align:center;font-size:15px;margin-top:-10px">1:1 대화도, 여럿이 있는 단톡방도 돼요</p>` : ""}
       <div class="cta"><label class="btn primary block" for="file">카톡 대화 불러오기</label>
         <button class="btn plain" type="button" data-act="sample">샘플로 먼저 둘러보기</button>
+        ${rel === "friend" ? `<button class="btn plain" type="button" data-act="sample-group">단톡방 샘플 보기</button>` : ""}
         <button class="chip-back" type="button" data-rel="" style="margin-top:4px">${({ crush: "짝사랑", friend: "친구" })[rel] || "연인"} · 관계 다시 고르기</button></div>
       ${trustCard(true)}
       <p class="status" id="status" role="status" aria-live="polite">${MOBILE ? "" : "파일을 이 화면에 끌어다 놓아도 돼요."}</p>
@@ -350,7 +367,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (!infoDraft) {
       infoDraft = state.info ? JSON.parse(JSON.stringify(state.info)) : { since: "", me: null, mbti: {} };
       infoDraft.names = [A(), B()].map(n => state.info ? n : cleanName(n));
-      if (!state.info && state.isSample) infoDraft = FRIEND() ? { since: "", me: null, mbti: {}, names: [A(), B()] } : CRUSH() ? { since: "", me: A(), mbti: {}, names: [A(), B()] } : { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" }, names: [A(), B()] };
+      if (!state.info && state.isSample) infoDraft = GROUP() ? { since: "", me: null, mbti: {}, names: [A(), B()] } : FRIEND() ? { since: "", me: null, mbti: {}, names: [A(), B()] } : CRUSH() ? { since: "", me: A(), mbti: {}, names: [A(), B()] } : { since: U.addDays(ov.first, 30).slice(0, 7), me: A(), mbti: { [A()]: "ENFP", [B()]: "ISTJ" }, names: [A(), B()] };
     }
     const d = infoDraft;
     const opt = p => `<select data-mbti="${e(p)}" aria-label="${e(p)}의 MBTI"><option value="">모르겠어요</option>${Couple.TYPES.map(t => `<option${d.mbti[p] === t ? " selected" : ""}>${t}</option>`).join("")}</select>`;
@@ -359,6 +376,19 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const sy = d.since ? +d.since.slice(0, 4) : null, sm = d.since ? +d.since.slice(5, 7) : null;
     const ymSel = `<div class="ym"><select id="since-y" aria-label="해"><option value="">연도</option>${yrs.map(y => `<option${sy === y ? " selected" : ""}>${y}</option>`).join("")}</select><select id="since-m" aria-label="달"><option value="">월</option>${Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2, "0")}"${sm === m ? " selected" : ""}>${m}월</option>`).join("")}</select></div>`;
     const nameField = `<div class="field"><b>이렇게 불러도 될까요?</b>${[0, 1].map(i => { const cur = [A(), B()][i], orig = (state.origNames || [A(), B()])[i]; return `<div class="mrow"><span class="nm" style="font-size:14px;font-weight:600;color:var(--muted)">카톡 이름<small style="font-size:13px;color:var(--fg);word-break:break-all">${e(orig)}</small></span><input type="text" data-rename="${i}" value="${e(d.names[i])}" maxlength="12" placeholder="${e(cur)}" aria-label="${e(orig)}을 부를 이름" autocomplete="off"></div>`; }).join("")}<small>카톡에 애칭이나 이모티콘으로 저장돼 있으면 글이 어색할 수 있어요. 이야기에 쓸 이름으로 바꿔 주세요.${[A(), B()].some(n => cleanName(n) !== n) ? " 기호는 미리 빼 두었어요." : ""}</small></div>`;
+    if (GROUP()) {
+      const gp = state.group.people.slice(0, 12), orig = state.gOrig || {};
+      return `<header><h1 class="large" style="font-size:28px">우리 방에 대해<br>조금만 알려 주세요</h1><p class="large-sub">${gp.length}명이 있는 단톡방이에요. 몰라도 괜찮아요.</p></header>
+      <div class="panel info">
+        ${state.isSample ? `<p class="note" style="text-align:left;background:var(--p-us);color:var(--tint);padding:10px 12px;border-radius:12px">샘플 단톡방이에요. 그대로 넘어가도 돼요.</p>` : ""}
+        <div class="field"><b>이렇게 불러도 될까요?</b>${gp.map((p, i) => `<div class="mrow"><span class="nm" style="font-size:14px;font-weight:600;color:var(--muted)">카톡 이름<small style="font-size:13px;color:var(--fg);word-break:break-all">${e(orig[p.name] || p.name)}</small></span><input type="text" data-grename="${e(p.name)}" value="${e(p.name)}" maxlength="12" aria-label="${e(p.name)}을 부를 이름" autocomplete="off"></div>`).join("")}<small>애칭이나 이모티콘 이름이면 이야기에 쓸 이름으로 바꿔 주세요. 말이 많은 순서로 12명까지 보여요.</small>${infoErr ? `<p class="nt warn" style="margin:0">${e(infoErr)}</p>` : ""}</div>
+        <div class="field"><b>나는 누구인가요?</b><select id="gme" aria-label="나"><option value="">고르지 않을래요</option>${state.group.people.map(p => `<option${d.me === p.name ? " selected" : ""}>${e(p.name)}</option>`).join("")}</select></div>
+        <div class="field"><b>언제부터 친구였나요?</b>${ymSel}<small>몰라도 괜찮아요. 알려 주면 우리들의 이야기에 나와요.</small></div>
+        <button class="btn primary block" type="button" data-act="info-save">우리 방 보러 가기</button>
+        <button class="btn plain" type="button" data-act="info-skip">${state.info ? "바꾸지 않고 돌아가기" : "건너뛰기"}</button>
+        <p class="lockline">${ico("lock")}이 정보도 서버로 보내지 않고, 이 기기에만 저장돼요</p>
+      </div>`;
+    }
     if (FRIEND()) {
       return `<header><h1 class="large" style="font-size:28px">두 사람에 대해<br>조금만 알려 주세요</h1><p class="large-sub">몰라도 괜찮아요. 알려 주면 우정 이야기가 더 정확해져요.</p></header>
       <div class="panel info">
@@ -399,6 +429,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const d = infoDraft || { mbti: {} };
     document.querySelectorAll("[data-rename]").forEach(x => { d.names[+x.dataset.rename] = x.value.trim(); });
     const y = $("#since-y"), m = $("#since-m"); d.since = y && m && y.value && m.value ? `${y.value}-${m.value}` : "";
+    const gm = $("#gme"); if (gm) d.me = gm.value || null;
     document.querySelectorAll("[data-mbti]").forEach(x => { if (x.value) d.mbti[x.dataset.mbti] = x.value; else delete d.mbti[x.dataset.mbti]; });
     return d;
   }
@@ -505,6 +536,46 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     </div>${trustCard(true)}<p class="status" id="status" role="status" aria-live="polite"></p></section>`;
     return h;
   }
+  /* ---------- 단톡방 홈·타일 (v19) ---------- */
+  const GCOL = ["#2f6fe0", "#e8456b", "#1f9c93", "#d97f00", "#9150e0", "#2e9e4f", "#5b57d6", "#c2410c", "#0e7490", "#be185d"];
+  const gcol = i => GCOL[i % GCOL.length];
+  const gtop = (key, low) => { const ps = state.group.people.filter(p => p[key] != null); return ps.reduce((a, b) => (low ? b[key] < a[key] : b[key] > a[key]) ? b : a, ps[0]); };
+  function groupCards() {
+    const g = state.group, ps = g.people, maker = gtop("react"), opener = gtop("init"), carer = ps.slice().sort((a, b) => (b.care + b.ask) - (a.care + a.ask))[0], pr = g.pairs[0];
+    return [
+      ["gbond", `${g.score}점`, Group.verdict(g.score)],
+      ["gshare", ps[0].name, `말풍선 ${Math.round(ps[0].share * 100)}% · 가장 많이 이야기해요`],
+      ["glaugh", maker.name, `${maker.name}의 말 뒤에 웃음 ${num(maker.react)}번`],
+      ["gfirst", opener.name, `조용한 방에 먼저 말 건 게 ${num(opener.init)}번`],
+      ["gpair", pr ? `${pr.a} · ${pr.b}` : "아직 몰라요", pr ? `10분 안에 주고받은 게 ${num(pr.n)}번` : ""],
+      ["gcare", carer.name, `안부·걱정·응원 ${num(carer.care + carer.ask)}번`]
+    ];
+  }
+  function homeGroup() {
+    const g = state.group;
+    let h = "";
+    if (state.isSample) h += `<div class="group sample-note"><span>가상의 단톡방으로 보는 중이에요</span><label class="btn primary small" for="file">내 대화 불러오기</label></div>`;
+    h += `<section class="group score-card">
+      <div class="score-line">${C.gauge(g.score, "ring")}<div><p class="score-big"><b>${g.score}</b>점 / 100점</p><p class="score-verdict">${e(Group.verdict(g.score))}</p><p class="cap" style="font-size:13px">우정 지수 · 단톡방으로 본 재미용 점수</p></div></div>
+      <div class="stats couple" style="padding:0;gap:0"><div class="stats" style="margin:0 -18px -18px"><div><span>주고받은 말풍선</span><b>${num(g.total)}</b></div><div><span>함께한 사람</span><b>${g.people.length}<small>명</small></b></div><div><span>이야기한 날</span><b>${num(g.chatDays)}<small>일</small></b></div></div></div>
+    </section>`;
+    h += `<a class="banner" href="#story" data-go="story">${ico("book")}<div><b>우리들의 이야기 읽기</b><span>첫 대화부터 오늘까지, 여덟 장으로</span></div>${ico("next", "chev")}</a>`;
+    h += `<section class="sec"><div class="sec-h"><h3>궁금한 걸 눌러 보세요</h3></div><div class="qgrid">${groupCards().map(tile).join("")}</div></section>`;
+    const top = Group.advice(g).items[0];
+    h += `<section class="sec"><div class="sec-h"><h3>더 친해지려면</h3><a href="#advice" data-go="advice">전체 보기</a></div>
+      <a class="group pad" href="#advice" data-go="advice" style="display:grid;gap:3px;text-decoration:none">${top ? `<span style="font-weight:600">${e(top.title)}</span><span class="cap" style="font-size:15px">${e(top.how)}</span>` : `<span style="font-weight:600">지금처럼만 하면 돼요</span><span class="cap" style="font-size:15px">다 같이 모이는 날 하나만 정해 보세요.</span>`}</a></section>`;
+    h += `<section class="sec"><div class="group">
+      <a class="row noicon" href="#info" data-go="info" style="color:var(--tint);font-weight:600;text-decoration:none">정보 ${state.info ? "고치기" : "알려 주기"} <span class="cap" style="font-weight:400;margin-left:6px">이름 · 나 · 친구가 된 때</span></a>
+      <label class="row noicon" for="file" style="color:var(--tint);cursor:pointer;font-weight:600">새 대화 불러오기</label>
+      ${state.isSample ? "" : `<button class="row noicon btn danger" type="button" data-act="forget" style="width:100%;background:none;border-radius:0;justify-content:flex-start;font-weight:400">이 기기에 저장된 결과 지우기</button>`}
+    </div>${trustCard(true)}<p class="status" id="status" role="status" aria-live="polite"></p></section>`;
+    return h;
+  }
+  function groupList() {
+    return `<div class="qgrid">${groupCards().map(tile).join("")}</div>
+      <p class="foot">단톡방의 역할과 우정 지수는 카톡 속 말과 시간으로 본 재미용이에요. 다른 단톡방과 비교한 결과는 없어요.</p>`;
+  }
+
   /* ---------- 친구 홈·타일 (v18) ---------- */
   function friendCards() {
     const f = state.friend, r = state.r, ov = r.overview, rs = r.speed.reply;
@@ -580,6 +651,10 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   }
   function scene(sc, title) {
     if (!sc || !sc.lines || !sc.lines.length) return "";
+    if (GROUP()) {
+      const idx = Object.fromEntries(state.group.people.map((p, i) => [p.name, i]));
+      return `<div class="scene gscene"><header><b>${e(title)}</b><span>${U.fmtDate(sc.date)}</span></header>${sc.lines.map((l, i) => `<div class="bub g" style="--gc:${gcol(idx[l.who] ?? 9)};animation-delay:${i * 0.08}s"><small>${e(l.who)} · ${e(U.hm(new Date(l.t).getHours() * 60 + new Date(l.t).getMinutes()))}</small>${e(l.text)}</div>`).join("")}</div>`;
+    }
     return `<div class="scene"><header><b>${e(title)}</b><span>${U.fmtDate(sc.date)}</span></header>${sc.lines.map((l, i) => `<div class="bub ${l.who === A() ? "a" : "b"}" style="animation-delay:${i * 0.08}s"><small>${e(l.who)} · ${e(U.hm(new Date(l.t).getHours() * 60 + new Date(l.t).getMinutes()))}</small>${e(l.text)}</div>`).join("")}</div>`;
   }
   const monthLabels = keys => keys.map(k => { const [y, m] = k.split("-"); return m === "01" || k === keys[0] ? `${y.slice(2)}.${+m}` : `${+m}월`; });
@@ -595,6 +670,9 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       viz = `<div class="versus">${row(la, va, "pa")}${row(lb, vb, "pb")}</div>`;
     } else if (x.big != null) {
       viz = `<div class="bignum"><b>${e(x.big)}</b>${x.bigSub ? `<span>${e(x.bigSub)}</span>` : ""}</div>`;
+    } else if (x.ranks) {
+      const mx = Math.max(1, ...x.ranks.map(r => Math.abs(r.v || 0)));
+      viz = `<div class="ranks">${x.ranks.map((r, i) => `<div class="rrow${i === 0 ? " top" : ""}"><span class="rn" style="color:${r.c}">${e(r.name)}</span><span class="vbar"><i style="width:${Math.max(3, Math.abs(r.v || 0) / mx * 100)}%;background:${r.c}"></i></span><span class="vv">${e(r.label)}</span></div>`).join("")}</div>`;
     } else if (x.langs) {
       viz = `<div class="langs">${x.langs.map(l => `<div class="lrow${l.top ? " top" : ""}"><span class="ln">${e(l.label)}</span><span class="vbar"><i style="width:${Math.max(3, l.share)}%"></i></span><span class="vv">${l.share}%</span></div>`).join("")}</div>${x.quotes && x.quotes.length ? `<div class="lq">${x.quotes.map(q => `<q>${e(q)}</q>`).join("")}</div>` : ""}`;
     } else if (x.reasons) {
@@ -609,6 +687,48 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const pc = v => Math.round((v || 0) * 100);
   const mins = v => v == null ? "-" : num1(v) + "분";
   const INSIGHTS = {
+    gbond() { return state.group.parts.map(p => ({ title: p.label, text: p.say, big: `${p.pts}점`, bigSub: `${p.w}점 만점` })); },
+    gshare() {
+      const g = state.group, ps = g.people, col = Object.fromEntries(ps.map((p, i) => [p.name, gcol(i)]));
+      const rk = (arr, f, lab) => arr.slice(0, 8).map(p => ({ name: p.name, v: f(p), label: lab(p), c: col[p.name] }));
+      const owls = ps.filter(p => p.night > 0).sort((a, b) => b.nightShare - a.nightShare);
+      return [
+        { title: "말 지분", text: `가장 많이 이야기한 건 ${ps[0].name}(${Math.round(ps[0].share * 100)}%), 가장 조용한 건 ${ps[ps.length - 1].name}(${Math.round(ps[ps.length - 1].share * 100)}%)예요.`, ranks: rk(ps, p => p.n, p => `${num(p.n)}개 · ${Math.round(p.share * 100)}%`) },
+        owls.length ? { title: "밤 올빼미", text: `새벽 0~5시에 가장 자주 깨어 있던 건 ${owls[0].name}이에요. 말풍선의 ${Math.round(owls[0].nightShare * 100)}%가 새벽이에요.`.replace(/(.)이에요\. 말풍선/, (m, c) => (U.jong(c) ? c + "이에요" : c + "예요") + ". 말풍선"), ranks: rk(owls, p => p.nightShare, p => `${num(p.night)}개 · ${Math.round(p.nightShare * 100)}%`) } : null
+      ];
+    },
+    glaugh() {
+      const g = state.group, ps = g.people, col = Object.fromEntries(ps.map((p, i) => [p.name, gcol(i)]));
+      const byReact = ps.slice().sort((a, b) => b.react - a.react), byLaugh = ps.slice().sort((a, b) => b.laughShare - a.laughShare);
+      return [
+        { title: "가장 많이 웃게 한 사람", text: `${byReact[0].name}의 말 바로 뒤에 다른 사람의 웃음이 ${num(byReact[0].react)}번 따라왔어요.`, ranks: byReact.slice(0, 8).map(p => ({ name: p.name, v: p.react, label: `${num(p.react)}번`, c: col[p.name] })) },
+        { title: "가장 잘 웃어 준 사람", text: `${byLaugh[0].name}의 말풍선 ${Math.round(byLaugh[0].laughShare * 100)}%에 ㅋㅋ나 ㅎㅎ가 있어요.`, ranks: byLaugh.slice(0, 8).map(p => ({ name: p.name, v: p.laughShare, label: `${Math.round(p.laughShare * 100)}%`, c: col[p.name] })) },
+        g.laughMoments.length ? { title: "함께 웃었던 날들", text: `웃음이 가장 많이 오간 날 ${g.laughMoments.length}일을 골라 두었어요. 아래에서 그날의 대화를 다시 읽을 수 있어요.`, chips: g.laughMoments.map(m => `${U.fmtShort(m.date)} · ${num(m.n)}번`) } : null
+      ];
+    },
+    gfirst() {
+      const g = state.group, ps = g.people, col = Object.fromEntries(ps.map((p, i) => [p.name, gcol(i)]));
+      const byInit = ps.slice().sort((a, b) => b.init - a.init), byRep = ps.filter(p => p.replyMed != null).sort((a, b) => a.replyMed - b.replyMed);
+      return [
+        { title: "조용한 방에 먼저 말을 건 사람", text: `4시간 넘게 조용하던 방에 먼저 말을 건 건 ${byInit[0].name}(${num(byInit[0].init)}번)이 가장 많아요.`, ranks: byInit.slice(0, 8).map(p => ({ name: p.name, v: p.init, label: `${num(p.init)}번`, c: col[p.name] })) },
+        byRep.length ? { title: "답장이 가장 빠른 사람", text: `누군가 말하면 ${byRep[0].name}의 답이 가장 빨랐어요. 보통 ${num1(byRep[0].replyMed)}분 안이에요.`, ranks: byRep.slice(0, 8).map(p => ({ name: p.name, v: 1 / Math.max(0.5, p.replyMed), label: `${num1(p.replyMed)}분`, c: col[p.name] })) } : null
+      ];
+    },
+    gpair() {
+      const g = state.group, col = Object.fromEntries(g.people.map((p, i) => [p.name, gcol(i)]));
+      if (!g.pairs.length) return [{ title: "단짝", text: "아직 서로 주고받은 대화가 많지 않아요." }];
+      return [
+        { title: "가장 자주 주고받는 두 사람", text: `${g.pairs[0].a}${U.jong(g.pairs[0].a) ? "과" : "와"} ${g.pairs[0].b}. 서로의 말에 10분 안에 답한 게 ${num(g.pairs[0].n)}번이에요.`, ranks: g.pairs.map(x => ({ name: `${x.a} · ${x.b}`, v: x.n, label: `${num(x.n)}번`, c: col[x.a] })) }
+      ];
+    },
+    gcare() {
+      const g = state.group, ps = g.people, col = Object.fromEntries(ps.map((p, i) => [p.name, gcol(i)]));
+      const byCare = ps.slice().sort((a, b) => (b.care + b.ask) - (a.care + a.ask)), byMeet = ps.slice().sort((a, b) => b.meet - a.meet);
+      return [
+        { title: "안부·걱정·응원", text: `가장 자주 마음을 건넨 건 ${byCare[0].name}이에요(${num(byCare[0].care + byCare[0].ask)}번).`.replace(/(.)이에요\(/, (m, c) => (U.jong(c) ? c + "이에요" : c + "예요") + "("), ranks: byCare.slice(0, 8).map(p => ({ name: p.name, v: p.care + p.ask, label: `${num(p.care + p.ask)}번`, c: col[p.name] })) },
+        { title: "모이자는 말", text: `'만나', '모이자', '언제 봐' 같은 말을 가장 많이 꺼낸 건 ${byMeet[0].name}이에요.`.replace(/(.)이에요\.$/, (m, c) => U.jong(c) ? c + "이에요." : c + "예요."), ranks: byMeet.slice(0, 8).map(p => ({ name: p.name, v: p.meet, label: `${num(p.meet)}번`, c: col[p.name] })) }
+      ];
+    },
     fbond() { return state.friend.parts.map(p => ({ title: p.label, text: p.say, big: `${p.pts}점`, bigSub: `${p.w}점 만점` })); },
     flaugh() {
       const f = state.friend, hl = state.r.highlights, a = A(), b = B(), tc = p => state.r.overview.textCount[p] || 1;
@@ -840,6 +960,45 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   const yeoss = w => w + (U.jong(w) ? "이었어요" : "였어요");
 
   const RENDER = {
+    gbond() {
+      const g = state.group;
+      if (CAP) { CAP.read = `<section class="read"><h2>우정 지수 ${g.score}점 <span class="fun">재미용</span></h2><p>꾸준함, 웃음, 고른 참여, 답장, 챙김, 모임. 여섯 가지를 단톡방에서 찾아 더한 점수예요.</p><p>만나서 함께한 시간은 카톡에 남지 않으니, 점수는 참고만 해 주세요.</p></section>`; CAP.concl = `<section class="conclusion"><div class="eyebrow">이 코너의 결론</div><p>${e(g.score >= 60 ? "단톡방만 봐도 오래 이어질 사이예요. 이 방, 오래 지켜 주세요." : "단톡방 밖에서 쌓는 우정도 있어요. 가끔은 다 같이 모여서 채워 주세요.")}</p></section>`; }
+      return block("여섯 가지", table(["항목", "점수", "근거"], g.parts.map(p => [e(p.label), `${p.pts}/${p.w}`, e(p.say)]), [1]), "기준: 이야기한 날 60%, 웃음 든 말풍선 30%, 참여의 고르기 0.8, 30분 안 답장 80%, 챙김·모임 말 1000개당 60번이면 만점이에요.");
+    },
+    gshare() {
+      const g = state.group;
+      if (CAP) CAP.read = `<section class="read"><h2>누가 제일 말이 많을까</h2><p>단톡방에서 각자 보낸 말풍선을 셌어요. 말수가 적어도 대화를 다 읽고 있는 친구도 있다는 걸 잊지 마세요.</p></section>`;
+      return block("모두의 기록", table(["이름", "말풍선", "지분", "웃음", "새벽"], g.people.map(p => [e(p.name), num(p.n), Math.round(p.share * 100) + "%", num(p.laughs), num(p.night)]), [1, 2, 3, 4]));
+    },
+    glaugh() {
+      const g = state.group;
+      if (CAP) CAP.read = `<section class="read"><h2>이 방의 분위기 메이커는</h2><p>누군가의 말 바로 뒤(10분 안)에 다른 사람이 ㅋㅋ로 답하면, 앞사람이 웃긴 걸로 셌어요.</p></section>`;
+      return g.laughMoments.length ? g.laughMoments.map(m => scene(m, `웃음 ${num(m.n)}번 오간 날`)).join("") : `<p class="cap">웃음이 몰린 날을 찾지 못했어요.</p>`;
+    },
+    gfirst() {
+      const g = state.group;
+      if (CAP) CAP.read = `<section class="read"><h2>누가 먼저 말을 걸까</h2><p>4시간 넘게 조용하던 방에 처음 말을 건 사람, 그리고 다른 사람 말에 60분 안에 답한 시간을 셌어요.</p></section>`;
+      return block("먼저 연락과 답장", table(["이름", "먼저 연락", "답장 중간값"], g.people.map(p => [e(p.name), num(p.init) + "번", p.replyMed == null ? "-" : num1(p.replyMed) + "분"]), [1, 2]), "답장이 30번보다 적은 사람은 중간값을 계산하지 않았어요.");
+    },
+    gpair() {
+      const g = state.group;
+      if (CAP) CAP.read = `<section class="read"><h2>이 방의 단짝은</h2><p>한 사람이 말하고 10분 안에 다른 사람이 이어서 말한 횟수를 두 사람씩 짝지어 셌어요.</p></section>`;
+      return block("주고받은 횟수", table(["두 사람", "횟수"], g.pairs.map(x => [`${e(x.a)} · ${e(x.b)}`, num(x.n) + "번"]), [1]));
+    },
+    gcare() {
+      const g = state.group;
+      if (CAP) CAP.read = `<section class="read"><h2>누가 제일 잘 챙길까</h2><p>안부를 묻는 질문, 걱정·응원·위로의 말, 그리고 만나자·모이자는 말을 셌어요.</p></section>`;
+      return block("챙김과 모임", table(["이름", "안부 질문", "걱정·응원", "모이자는 말"], g.people.map(p => [e(p.name), num(p.ask), num(p.care), num(p.meet)]), [1, 2, 3]));
+    },
+    groupAdvice() {
+      const a = Group.advice(state.group);
+      let h = `<section class="read"><h2>우리 방을 오래 지키는 법</h2><p>단톡방에서 보인 것들을 바탕으로 골랐어요. 정답은 아니에요.</p></section>`;
+      const item = (it, i) => `<div class="item"><h4>${i != null ? `<span class="num">${i + 1}</span>` : ""}${e(it.title)}</h4><div><div class="k">데이터에서 찾은 점</div><p>${e(it.why)}</p></div><div><div class="k">이렇게 해 보세요</div><p>${e(it.how)}</p></div></div>`;
+      if (a.items.length) h += block("해 볼 만한 것", `<div class="items">${a.items.map(item).join("")}</div>`);
+      if (a.good.length) h += block("이미 잘하고 있어요", `<div class="items">${a.good.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill good">잘함</span></h4><p>${e(g.why)}</p></div>`).join("")}</div>`);
+      h += block("늘 도움이 되는 것", `<div class="items">${a.general.map(g => `<div class="item"><h4>${e(g.title)} <span class="pill gen">일반적인 조언</span></h4><p>${e(g.how)}</p></div>`).join("")}</div>`);
+      return h;
+    },
     fbond() {
       const f = state.friend;
       if (CAP) { CAP.read = `<section class="read"><h2>우정 지수 ${f.score}점 <span class="fun">재미용</span></h2><p>꾸준함, 웃음, 주고받는 균형, 답장, 챙김, 함께하기. 여섯 가지를 카톡에서 찾아 더한 점수예요.</p><p>만나서 함께한 시간은 카톡에 남지 않으니, 점수는 참고만 해 주세요.</p></section>`; CAP.concl = `<section class="conclusion"><div class="eyebrow">이 코너의 결론</div><p>${e(f.score >= 60 ? "카톡만 봐도 든든한 친구 사이예요. 이 우정, 오래 지켜 주세요." : "카톡만으로는 다 보이지 않는 우정도 있어요. 가끔은 만나서 채워 주세요.")}</p></section>`; }
@@ -956,12 +1115,12 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       return h;
     },
     story() {
-      const s = CRUSH() ? state.crush.story : FRIEND() ? state.friend.story : state.story, r = state.r;
+      const s = CRUSH() ? state.crush.story : GROUP() ? state.gstory : FRIEND() ? state.friend.story : state.story, r = state.r;
       const op = (s.cover.opening || []).map((l, i) => `<p style="animation-delay:${0.3 + i * 0.9}s">${e(l)}</p>`).join("");
       const n = (s.cover.opening || []).length;
       const st = s.cover.start ? `<p class="start" style="animation-delay:${0.3 + n * 0.9 + 0.8}s">${e(s.cover.start)}</p>` : "";
       const opening = op ? `<section class="opening" aria-label="오프닝">${op}${st}</section>` : "";
-      const cover = `<section class="group cover"><p class="eyebrow">TALK VIEW</p><h2>${e(s.cover.title)}</h2><p class="sub">${e(s.cover.subtitle)}</p>${C.gauge(s.cover.score, "ring-lg")}<div class="eyebrow">${CRUSH() ? `호감 신호 · ${e(state.crush.verdict)}` : FRIEND() ? `우정 지수 · ${e(state.friend.verdict)}` : `사랑 지수 · ${verdict(s.cover.score)}`}</div>${CRUSH() || FRIEND() ? "" : `<div class="parts">${r.score.parts.map(p => `<span>${e(p.label)} ${p.pts}/${p.max}</span>`).join("")}</div>`}</section>`;
+      const cover = `<section class="group cover"><p class="eyebrow">TALK VIEW</p><h2>${e(s.cover.title)}</h2><p class="sub">${e(s.cover.subtitle)}</p>${C.gauge(s.cover.score, "ring-lg")}<div class="eyebrow">${CRUSH() ? `호감 신호 · ${e(state.crush.verdict)}` : GROUP() ? `우정 지수 · ${e(Group.verdict(state.group.score))}` : FRIEND() ? `우정 지수 · ${e(state.friend.verdict)}` : `사랑 지수 · ${verdict(s.cover.score)}`}</div>${CRUSH() || FRIEND() ? "" : `<div class="parts">${r.score.parts.map(p => `<span>${e(p.label)} ${p.pts}/${p.max}</span>`).join("")}</div>`}</section>`;
       const toc = `<nav class="toc" aria-label="목차">${s.chapters.map(c => `<a href="#story" data-jump="${c.id}">${e(c.title.replace(/^\d\. /, ""))}</a>`).join("")}</nav>`;
       return opening + cover + toc + s.chapters.map(c => `<article class="chapter" id="ch-${c.id}"><h2>${e(c.title)}</h2>${c.blocks.map(storyBlock).join("")}</article>`).join("");
     },
@@ -1092,8 +1251,28 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     const act = t.dataset.act;
     if (act === "back") back();
     else if (act === "sample") sample();
+    else if (act === "sample-group") sampleGroup();
     else if (act === "hide-install") { hideInstall = true; render(); }
     else if (act === "nettest") runNetTest();
+    else if (act === "info-save" && GROUP()) {
+      const d = readInfoForm(), map = {}, seen = new Set();
+      for (const x of document.querySelectorAll("[data-grename]")) {
+        const o = x.dataset.grename, nv = x.value.trim() || o;
+        if (seen.has(nv)) { infoErr = "이름이 겹치면 구분할 수 없어요. 다르게 적어 주세요."; render(); return; }
+        seen.add(nv); if (nv !== o) map[o] = nv;
+      }
+      const others = new Set(state.group.people.map(p => p.name).filter(n => !(n in map)));
+      if (Object.values(map).some(v => others.has(v))) { infoErr = "다른 사람과 같은 이름이에요. 다르게 적어 주세요."; render(); return; }
+      infoErr = "";
+      let me = ($("#gme") || {}).value || null;
+      if (Object.keys(map).length) {
+        if (me && map[me]) me = map[me];
+        if (!state.gOrig) state.gOrig = Object.fromEntries(state.group.people.map(p => [p.name, p.name]));
+        state.gOrig = Object.fromEntries(Object.entries(state.gOrig).map(([k, v]) => [map[k] || k, v]));
+        renameAll(map);
+      }
+      infoDraft = null; applyInfo({ since: d.since || null, me, mbti: {} }); go("home", true);
+    }
     else if (act === "info-save") {
       const d = readInfoForm();
       const olds = [A(), B()], news = d.names.map((n, i) => n || olds[i]);
@@ -1109,7 +1288,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
       }
       infoDraft = null; applyInfo({ since: d.since || null, me, mbti }); go("home", true);
     }
-    else if (act === "info-skip") { infoDraft = null; infoErr = ""; if (!state.info) { state.couple = Couple.make(state.r, {}); } go("home", true); }
+    else if (act === "info-skip") { infoDraft = null; infoErr = ""; if (GROUP() && !state.gstory) state.gstory = Group.story(state.group, {}); if (!state.info) { state.couple = Couple.make(state.r, {}); } go("home", true); }
     else if (act === "kakao" && !IN_APP) { setTimeout(() => flash("카카오톡이 열리지 않으면 직접 카카오톡을 열어 주세요."), 1500); }
     else if (act === "forget") { try { localStorage.removeItem(STORE); } catch (_) { /* 무시 */ } state = null; rel = null; go("home", true); setTimeout(() => flash("이 기기에 저장된 결과를 지웠어요."), 0); }
   });
@@ -1159,6 +1338,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
   // 시작: 이 기기에 저장된 결과가 있으면 홈, 없으면 시작 화면
   state = load();
   if (state && !state.r) state = null;
+  if (state && state.group && window.Group) { try { state.gstory = Group.story(state.group, state.info || {}); } catch (_) { state.group = null; } }
   if (state && state.rel === "friend" && window.Friend) { try { state.friend = Friend.make(state.r, { since: state.info && state.info.since, me: state.info && state.info.me }); } catch (_) { state = null; } }
   if (state && state.rel === "crush" && state.info && state.info.me && window.Crush) { try { state.crush = Crush.make(state.r, state.info.me, { likeSince: state.info.since }); } catch (_) { state.crush = null; } }
   if (state && state.r && !state.r.days) state.couple = null; // v10 이전 결과: 사귄 날 분석은 대화를 다시 불러와야 함

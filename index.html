@@ -48,6 +48,9 @@
   --c-fbond: var(--c-freq); --p-fbond: var(--p-freq); --c-flaugh: var(--c-speed); --p-flaugh: var(--p-speed);
   --c-ftalk: var(--c-balance); --p-ftalk: var(--p-balance); --c-freply: var(--c-mbti); --p-freply: var(--p-mbti);
   --c-fcare: var(--c-love); --p-fcare: var(--p-love); --c-ftopic: var(--c-life); --p-ftopic: var(--p-life);
+  --c-gbond: var(--c-freq); --p-gbond: var(--p-freq); --c-gshare: var(--c-balance); --p-gshare: var(--p-balance);
+  --c-glaugh: var(--c-speed); --p-glaugh: var(--p-speed); --c-gfirst: var(--c-mbti); --p-gfirst: var(--p-mbti);
+  --c-gpair: var(--c-love); --p-gpair: var(--p-love); --c-gcare: var(--c-life); --p-gcare: var(--p-life);
   --c-conflict: #e0483e; --p-conflict: #ffeceb;
   --f: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
   --r: 16px;
@@ -390,6 +393,17 @@ details.more[open] > summary::after { content: "접기"; }
 details.more[open] { padding-bottom: 16px; background: transparent; padding-left: 0; padding-right: 0; }
 details.more[open] > summary { background: var(--surface); border-radius: var(--r); padding: 16px; }
 
+/* v19: 단톡방 */
+.gchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.gchips span { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--surface); color: var(--gc, var(--muted)); box-shadow: 0 0 0 1px var(--line) inset; }
+.ranks { display: grid; gap: 7px; }
+.rrow { display: grid; grid-template-columns: minmax(56px, 34%) 1fr auto; gap: 10px; align-items: center; font-size: 15px; }
+.rrow .rn { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rrow .vbar i { opacity: .55; } .rrow.top .vbar i { opacity: 1; }
+.rrow .vv { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; } .rrow.top .vv { color: var(--fg); font-weight: 700; }
+.gscene .bub.g { justify-self: start; background: var(--gc); color: #fff; }
+.gscene .bub.g small { color: rgba(255,255,255,.85); }
+.info select#gme { font: inherit; font-size: 17px; }
 /* v18.1: 친구 모드는 파란색 */
 :root[data-mode="friend"] { --tint: #2f6fe0; --accent: #2f6fe0; --c-us: #2f6fe0; --p-us: #eaf2ff; }
 .pick[data-rel="friend"] { box-shadow: 0 0 0 1.5px #9dbcf5 inset; }
@@ -500,6 +514,7 @@ details.more[open] > summary { background: var(--surface); border-radius: var(--
 <script charset="utf-8" src="js/story.js"></script>
 <script charset="utf-8" src="js/crush.js"></script>
 <script charset="utf-8" src="js/friend.js"></script>
+<script charset="utf-8" src="js/group.js"></script>
 <script charset="utf-8" src="js/advice.js"></script>
 <script charset="utf-8" src="js/summary.js"></script>
 <script charset="utf-8" src="js/charts.js"></script>

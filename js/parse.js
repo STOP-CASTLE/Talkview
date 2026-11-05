@@ -130,10 +130,13 @@
     const cnt = {};
     for (const m of all) cnt[m.who] = (cnt[m.who] || 0) + 1;
     const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 2);
-    if (top.length < 2) return { people: top, messages: all, others: 0 };
+    // v19: 단톡방 이름(첫 줄 "방이름 N 님과 카카오톡 대화")
+    let title = null;
+    for (const f of sorted) { const m = String(f.text).replace(/^\uFEFF/, "").split(/\r?\n/)[0].match(/^(.+?)(?:\s+\d+)?\s*님과 카카오톡 대화/); if (m) { title = m[1].trim(); break; } }
+    if (top.length < 2) return { people: top, messages: all, others: 0, all, counts: cnt, title };
     const keep = all.filter(m => top.includes(m.who));
     const A = keep[0].who, B = top.find(p => p !== A);
-    return { people: [A, B], messages: keep, others: all.length - keep.length };
+    return { people: [A, B], messages: keep, others: all.length - keep.length, all, counts: cnt, title };
   }
 
   return { parseText, parseFiles, parseCSV, looksCSV, classify, naturalCompare };

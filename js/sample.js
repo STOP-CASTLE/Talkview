@@ -156,5 +156,27 @@
     return lines.join("\n");
   }
 
-  return { make, makeCrush, makeFriend };
+
+  /* 단톡 샘플(v19) — 가상의 다섯 사람, 방 이름 "고등학교 친구들". */
+  function makeGroup() {
+    const R = rng(20240302), pick = a => a[Math.floor(R() * a.length)], chance = p => R() < p;
+    const M = ["김하준", "정민서", "이도윤", "박서아", "최지호"], W = [0.28, 0.24, 0.2, 0.18, 0.1];
+    const who = () => { let x = R(), i = 0; while (i < M.length - 1 && x > W[i]) { x -= W[i]; i++; } return M[i]; };
+    const lines = ["고등학교 친구들 5 님과 카카오톡 대화", "저장한 날짜 : 2026. 11. 1. 오후 11:00", ""];
+    const start = new Date(2025, 2, 2), end = new Date(2026, 9, 31);
+    const fmt = (d, w, text) => `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${d.getHours() < 12 ? "오전" : "오후"} ${d.getHours() % 12 === 0 ? 12 : d.getHours() % 12}:${String(d.getMinutes()).padStart(2, "0")}, ${w} : ${text}`;
+    let n = 0;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), n++) {
+      if (!chance(n > 480 ? 0.35 : 0.5)) continue;
+      let t = new Date(d); t.setHours(chance(0.12) ? 1 : 12 + Math.floor(R() * 10), Math.floor(R() * 60), 0, 0);
+      const out = [], say = (w, text, gap) => { t = new Date(t.getTime() + (gap == null ? 1 + Math.floor(R() * 6) : gap) * 60000); out.push(fmt(t, w, text)); };
+      say(who(), pick(["얘들아", "다들 뭐해", "ㅋㅋㅋㅋ 이거 봐", "나 오늘 진짜 웃긴 일 있었음", "주말에 다들 시간 돼?", "배고프다", "오늘 회사 너무 힘들었다"]), 0);
+      const k = 4 + Math.floor(R() * 16);
+      for (let i = 0; i < k; i++) say(who(), pick(["ㅋㅋㅋㅋㅋ", "ㅋㅋㅋㅋㅋㅋ 미쳤다", "아 진짜 웃기네 ㅋㅋ", "인정", "ㄹㅇ", "그거 완전 너잖아 ㅋㅋㅋ", "괜찮아? 무리하지 마", "힘내 ㅠㅠ", "토요일 어때?", "나 일요일만 돼", "그럼 토요일 저녁에 만나자", "다들 잘 지내지?", "오늘 뭐 먹었어?", "ㅇㅋ", "웅웅", "사진", "이모티콘", "ㅋㅋ 그건 좀", "생일 축하해!!", "고마워 ㅋㅋ", "잘 자"]), chance(0.1) ? 15 + Math.floor(R() * 40) : null);
+      lines.push(...out);
+    }
+    return lines.join("\n");
+  }
+
+  return { make, makeCrush, makeFriend, makeGroup };
 });
