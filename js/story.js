@@ -77,7 +77,8 @@
     if (first) opening.push(`${fmtDate(ov.first)}, ${timeOf(first.t)}.`, `${iga(first.who)} 처음으로 말을 걸었어요.`, `“${short(first.text, 30)}”`);
     else opening.push(`${fmtDate(ov.first)}.`, "두 사람의 첫 대화가 시작됐어요.");
     opening.push("그때는 몰랐을 거예요.", `이 한 줄이 ${num(ov.total)}개의 말풍선이 되고,`, `${num(days)}일의 이야기가 될 줄은.`);
-    const cover = { title: `${A} ♥ ${B}`, subtitle: "우리의 모든 순간을 사랑으로 기억하다", score: r.score.total, opening };
+    const start = `이제, ${A}${gwawa(A).slice(A.length)} ${B}의 사랑 이야기를 시작할게요.`;
+    const cover = { title: `${A} ♥ ${B}`, subtitle: "우리의 모든 순간을 사랑으로 기억하다", score: r.score.total, opening, start };
 
     /* ---------- 프롤로그 ---------- */
     ch.push({ id: "prologue", title: "프롤로그", blocks: [

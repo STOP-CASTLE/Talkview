@@ -616,7 +616,9 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     story() {
       const s = state.story, r = state.r;
       const op = (s.cover.opening || []).map((l, i) => `<p style="animation-delay:${0.3 + i * 0.9}s">${e(l)}</p>`).join("");
-      const opening = op ? `<section class="opening" aria-label="오프닝">${op}</section>` : "";
+      const n = (s.cover.opening || []).length;
+      const st = s.cover.start ? `<p class="start" style="animation-delay:${0.3 + n * 0.9 + 0.8}s">${e(s.cover.start)}</p>` : "";
+      const opening = op ? `<section class="opening" aria-label="오프닝">${op}${st}</section>` : "";
       const cover = `<section class="group cover"><p class="eyebrow">TALK VIEW</p><h2>${e(s.cover.title)}</h2><p class="sub">${e(s.cover.subtitle)}</p>${C.gauge(s.cover.score, "ring-lg")}<div class="eyebrow">사랑 지수 · ${verdict(s.cover.score)}</div><div class="parts">${r.score.parts.map(p => `<span>${e(p.label)} ${p.pts}/${p.max}</span>`).join("")}</div></section>`;
       const toc = `<nav class="toc" aria-label="목차">${s.chapters.map(c => `<a href="#story" data-jump="${c.id}">${e(c.title.replace(/^\d\. /, ""))}</a>`).join("")}</nav>`;
       return opening + cover + toc + s.chapters.map(c => `<article class="chapter" id="ch-${c.id}"><h2>${e(c.title)}</h2>${c.blocks.map(storyBlock).join("")}</article>`).join("");
