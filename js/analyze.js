@@ -286,6 +286,8 @@
       firstLove: love.love.first ? around(love.love.first.i, 3) : null,
       firstMiss: love.miss.first ? around(love.miss.first.i, 3) : null,
       peakDay: r.topDays[0] ? pickScene(r.topDays[0].date, WARM) : null,
+      // v18.2: 함께 웃었던 순간들 — ㅋㅋ가 많이 오간 날 상위 4일의 장면(같은 달은 하나만)
+      laughMoments: (() => { const out = [], seen = new Set(); for (const k of Object.keys(dayLaugh).sort((a, b) => dayLaugh[b] - dayLaugh[a])) { if (out.length >= 4 || dayLaugh[k] < 3) break; if (seen.has(k.slice(0, 7))) continue; const sc = pickScene(k, /[ㅋㅎ]{2,}/); if (sc) { seen.add(k.slice(0, 7)); out.push(Object.assign(sc, { n: dayLaugh[k] })); } } return out.sort((a, b) => a.date < b.date ? -1 : 1); })(),
       laughDay: (() => { const k = Object.keys(dayLaugh).sort((a, b) => dayLaugh[b] - dayLaugh[a])[0]; if (!k) return null; const sc = pickScene(k, /[ㅋㅎ]{2,}/); return sc ? Object.assign(sc, { n: dayLaugh[k] }) : null; })(),
       latest: { date: lastDay, lines: sceneOf(messages, N - 9, N) },
       longestScene: { date: r.speed.maxSession.date, lines: sceneOf(messages, maxS.start, maxS.start + 9) }

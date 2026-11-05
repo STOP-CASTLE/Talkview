@@ -214,7 +214,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
         <div class="panel">${cap.read || ""}
           ${ins.length ? `<section class="insights">${ins.map(x => insightCard(x, route)).join("")}</section>` : ""}
           ${cap.concl || ""}
-          <details class="more"><summary>숫자와 그래프로 자세히 보기</summary><div class="panel" style="padding-top:16px">${body}</div></details>
+          <details class="more"${route === "flaugh" ? " open" : ""}><summary>${route === "flaugh" ? "그날의 대화 다시 읽기" : "숫자와 그래프로 자세히 보기"}</summary><div class="panel" style="padding-top:16px">${body}</div></details>
         </div>`;
     }
     $("#main").innerHTML = `<div class="view">${html}</div>`;
@@ -613,9 +613,9 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     flaugh() {
       const f = state.friend, hl = state.r.highlights, a = A(), b = B(), tc = p => state.r.overview.textCount[p] || 1;
       return [
-        { title: "더 많이 웃긴 사람", text: `${f.funnier}의 말 바로 뒤에 상대의 ㅋㅋ가 따라온 게 ${num(f.react[f.funnier])}번이에요. ${U.eunneun(f.funnier)} 이 대화방의 웃음 담당이에요.`, versus: [f.react[a], f.react[b]], fmt: v => num(v) + "번" },
+        { title: "더 많이 웃긴 사람", text: `${f.funnier}의 말 바로 뒤에 상대의 ㅋㅋ가 따라온 게 ${num(f.react[f.funnier])}번이에요. 상대를 가장 자주 웃게 한 사람이에요.`, versus: [f.react[a], f.react[b]], fmt: v => num(v) + "번" },
         { title: "더 자주 웃은 사람", text: `ㅋㅋ나 ㅎㅎ가 든 말풍선은 ${a} ${num(f.laughBy[a])}개(${Math.round(f.laughBy[a] / tc(a) * 100)}%), ${b} ${num(f.laughBy[b])}개(${Math.round(f.laughBy[b] / tc(b) * 100)}%)예요.`, versus: [f.laughBy[a], f.laughBy[b]], fmt: v => num(v) + "개" },
-        hl.laughDay ? { title: "가장 많이 웃은 날", text: `${U.fmtDate(hl.laughDay.date)}, 하루에 ㅋㅋ가 든 말풍선이 ${num(hl.laughDay.n)}개였어요. 자세히 보기에서 그날 대화를 볼 수 있어요.`, big: U.fmtShort(hl.laughDay.date), bigSub: `웃음 ${num(hl.laughDay.n)}번` } : null
+        (hl.laughMoments && hl.laughMoments.length) ? { title: "함께 웃었던 날들", text: `웃음이 가장 많이 오간 날 ${hl.laughMoments.length}일을 골라 두었어요. 아래 '자세히 보기'를 펼치면 그날의 대화를 다시 읽을 수 있어요.`, chips: hl.laughMoments.map(m => `${U.fmtShort(m.date)} · ${num(m.n)}번`) } : null
       ];
     },
     ftalk() {
@@ -848,7 +848,8 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     flaugh() {
       const hl = state.r.highlights;
       if (CAP) CAP.read = `<section class="read"><h2>누가 더 웃길까</h2><p>ㅋㅋ나 ㅎㅎ가 든 말풍선을 '웃음'으로 셌어요. 그리고 한 사람의 말 바로 뒤(10분 안)에 상대가 ㅋㅋ로 답하면, 앞사람이 웃긴 걸로 셌어요.</p></section>`;
-      return hl.laughDay ? scene(hl.laughDay, "가장 많이 웃은 날") : `<p class="cap">웃음이 몰린 날을 찾지 못했어요.</p>`;
+      const ms = hl.laughMoments && hl.laughMoments.length ? hl.laughMoments : hl.laughDay ? [hl.laughDay] : [];
+      return ms.length ? ms.map(m => scene(m, `웃음 ${num(m.n)}번 오간 날`)).join("") : `<p class="cap">웃음이 몰린 날을 찾지 못했어요.</p>`;
     },
     ftalk() {
       const r = state.r, keys = Object.keys(r.monthly).sort();
