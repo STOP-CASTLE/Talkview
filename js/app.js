@@ -182,6 +182,7 @@ const SHOW_NAMES = true; // 두 사람 이름은 보여 준다 (v5.3, 사용자 
     if (!state && route !== "safe") route = "home";
     if (state && route in DETAIL) { const ids = modeIds(); if (ids ? !ids.includes(route) : (CR_IDS.includes(route) || FR_IDS.includes(route))) route = "analysis"; } // 관계별 화면 섞이지 않게
     if (state && CRUSH() && !state.crush && route !== "info" && route !== "safe") route = "info"; // 짝사랑은 '나'부터
+    document.documentElement.dataset.mode = (state ? state.rel : rel) || ""; // 친구는 파란색(v18.1)
     const inDetail = route in DETAIL;
     const title = !state ? "" : inDetail ? DETAIL[route][0] : topTitle(route);
     $("#appbar").classList.toggle("solid", inDetail);

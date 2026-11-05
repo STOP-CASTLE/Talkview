@@ -77,83 +77,85 @@
     return out;
   }
 
-  /* ---------- 우정 이야기 (확정 틀, 친구 버전) ---------- */
+  /* ---------- 우정 이야기 (확정 틀, 친구 버전 — v18.1: 더 활기차게) ----------
+     친구 사이답게 짧고 통통 튀는 문장, 장난스러운 장 제목, 느낌표. 사실(숫자·날짜·대사)은 데이터만. */
   function story(r, f, info) {
     const { A, B } = f, ov = r.overview, sp = r.speed, hl = r.highlights, L = r.love;
     const first = hl.opening && hl.opening.lines.find(isText);
     const days = ov.span, ch = [];
     const since = info.since && /^\d{4}-\d{2}/.test(info.since) ? info.since.slice(0, 7) : null;
+    const lb = f.laughBy, laughs = lb[A] + lb[B], per = r.balance.per;
+    const careAll = f.careOf[A] + f.careOf[B], askAll = per[A].askCare + per[B].askCare;
+
     const opening = [];
     if (first) opening.push(`${fmtDate(ov.first)}, ${timeOf(first.t)}.`, `${iga(first.who)} 먼저 말을 걸었어요.`, `“${short(first.text, 30)}”`);
-    else opening.push(`${fmtDate(ov.first)}.`, "두 사람의 대화가 시작됐어요.");
-    opening.push("그때는 몰랐을 거예요.", `이 한 줄이 ${num(days)}일의 우정이 될 줄은.`);
-    const cover = { title: `${A} & ${B}`, subtitle: "우리의 우정을 기억하다", score: f.score, opening, start: `이제, ${and(A, B)}의 우정 이야기를 시작할게요.` };
+    else opening.push(`${fmtDate(ov.first)}.`, "두 사람의 수다가 시작됐어요.");
+    opening.push("그때는 몰랐겠죠.", `이 한 줄이 ${num(ov.total)}개의 수다가 되고,`, `${num(laughs)}번의 ㅋㅋ가 될 줄은!`);
+    const cover = { title: `${A} & ${B}`, subtitle: "우리의 우정을 기억하다", score: f.score, opening, start: `자, ${and(A, B)}의 우정 이야기, 지금 시작합니다!` };
 
-    const lb = f.laughBy;
     ch.push({ id: "prologue", title: "프롤로그", blocks: [
-      P(`누군가 저에게 이 두 사람을 소개해 달라고 한다면, 아마 이렇게 이야기할 것 같아요. 저는 두 사람이 나눈 ${num(ov.total)}개의 말풍선을 처음부터 끝까지 읽었거든요.`),
-      P(`좋은 친구는 대단한 걸 함께하는 사람이 아니에요. 별것 아닌 일을 제일 먼저 말하고 싶은 사람이에요. ${and(A, B)}도 그랬어요.${since ? ` ${fmtDate(since)}부터 친구였다고 하니, 이 대화는 그 우정의 일부를 담고 있어요.` : ""}`),
-      P(`${num(days)}일 동안 두 사람은 ${num(ov.chatDays)}일을 이야기했어요. 그리고 ${num(lb[A] + lb[B])}번 웃었어요. 적어도 ㅋㅋ나 ㅎㅎ로 남은 웃음만 세어도 그만큼이에요.`),
+      P(`이 두 사람을 소개해 달라고요? 좋아요, 제가 할게요. 무려 ${num(ov.total)}개의 말풍선을 처음부터 끝까지 다 읽었거든요. 중간중간 같이 웃으면서요.`),
+      P(`친구가 뭐냐고 물으면 저는 이렇게 답할래요. 웃긴 걸 보면 제일 먼저 떠오르는 사람. ${and(A, B)}가 딱 그랬어요.${since ? ` 친구가 된 건 ${fmtDate(since)}부터라고 하니, 이 대화는 그 긴 우정의 한 조각이에요.` : ""}`.replace(`${and(A, B)}가`, `${and(A, B)}${U.jong(B) ? "이" : "가"}`)),
+      P(`${num(days)}일 동안 ${num(ov.chatDays)}일을 떠들었고, ㅋㅋ나 ㅎㅎ가 들어간 말풍선만 ${num(laughs)}개예요. 진짜 많이 웃었어요, 이 두 사람.`),
       { type: "stats", items: [
-        { label: "함께 이야기한 날", value: num(ov.chatDays) + "일", sub: `${num(days)}일 중` },
-        { label: "주고받은 말풍선", value: num(ov.total) + "개", sub: `하루 평균 ${num(ov.avgPerDay)}개` },
-        { label: "웃음이 든 말풍선", value: num(lb[A] + lb[B]) + "개", sub: "ㅋㅋ · ㅎㅎ" },
-        { label: "가장 긴 연속 대화", value: num(ov.longestStreak) + "일", sub: "하루도 안 빠지고" }
+        { label: "같이 떠든 날", value: num(ov.chatDays) + "일", sub: `${num(days)}일 중` },
+        { label: "주고받은 수다", value: num(ov.total) + "개", sub: `하루 평균 ${num(ov.avgPerDay)}개` },
+        { label: "ㅋㅋ가 터진 말풍선", value: num(laughs) + "개", sub: "적어도 이만큼은 웃었어요" },
+        { label: "연속 수다 기록", value: num(ov.longestStreak) + "일", sub: "하루도 안 빠지고!" }
       ] },
-      { type: "lines", lines: ["먼저, 두 사람이 어떤 사람이었는지부터 이야기할게요."] }
+      { type: "lines", lines: ["그럼 먼저, 이 두 사람부터 소개할게요!"] }
     ] });
 
-    ch.push({ id: "people", title: `1. ${ira(A)} 사람, ${ira(B)} 사람`, blocks: [
-      P("같은 대화방에 있었지만, 두 사람은 꽤 다른 사람이었어요. 대화를 읽다 보면 그게 보여요."),
+    ch.push({ id: "people", title: `1. 이 둘을 소개합니다`, blocks: [
+      P(`같은 대화방에서 매일 떠들었지만, ${and(A, B)}는 꽤 다른 사람이에요. 그래서 더 재밌어요.`.replace(`${and(A, B)}는`, `${and(A, B)}${U.jong(B) ? "은" : "는"}`)),
       ...Story.portrait(r, A, B, { friend: true }),
       ...Story.portrait(r, B, A, { friend: true }),
-      P("이렇게 다른 두 사람이라서, 오히려 오래 친구일 수 있었는지도 몰라요.")
+      { type: "aside", text: `이 대화방의 웃음 담당: ${f.funnier}. ${f.funnier}의 말 뒤에 ㅋㅋ가 ${num(f.react[f.funnier])}번 따라왔어요!` }
     ] });
 
-    const b1 = [P("모든 우정에는 첫 대화가 있어요. 그때는 그게 시작인 줄도 모르고 지나가지만요.")];
-    if (first) b1.push(P(`${fmtDate(ov.first)}, ${timeOf(first.t)}. ${iga(first.who)} 먼저 말을 걸었어요. 지금 보면 별것 아닌 대화인데, 모든 게 여기서 시작됐어요.`));
-    if (hl.opening) b1.push({ type: "scene", title: "첫 대화", date: hl.opening.date, lines: hl.opening.lines });
-    ch.push({ id: "c1", title: "2. 처음 말을 건 날", blocks: b1 });
+    const b1 = [P("모든 찐친도 처음엔 어색했어요. 그 어색한 첫마디를 다시 보는 게 우정 이야기의 제일 웃긴 부분이에요.")];
+    if (first) b1.push(P(`${fmtDate(ov.first)}, ${timeOf(first.t)}. ${iga(first.who)} 먼저 말을 걸었어요. 지금 보면 "이게 시작이었다고?" 싶을 만큼 별거 없는 대화예요. 원래 그런 거예요, 좋은 우정은.`));
+    if (hl.opening) b1.push({ type: "scene", title: "모든 게 시작된 대화", date: hl.opening.date, lines: hl.opening.lines });
+    ch.push({ id: "c1", title: "2. 시작은 별거 없었다", blocks: b1 });
 
-    const b2 = [P("친구랑 나눈 대화를 다시 읽으면, 내용은 기억 안 나도 그때 웃었던 건 기억나요.")];
-    b2.push(P(`두 사람 중 더 자주 웃은 건 ${yeoss(f.laugher)}. 그리고 상대를 더 많이 웃긴 건 ${yeoss(f.funnier)}. ${f.funnier}의 말 바로 뒤에 ㅋㅋ가 따라온 게 ${num(f.react[f.funnier])}번이에요.`));
+    const b2 = [P("친구랑 나눈 카톡을 다시 읽으면, 무슨 얘기였는지는 기억 안 나도 그때 배 잡고 웃은 건 기억나요.")];
+    b2.push(P(`더 자주 웃은 건 ${yeoss(f.laugher)}. 그리고 더 많이 웃긴 건 ${yeoss(f.funnier)}! ${f.funnier}${U.jong(f.funnier) ? "이" : "가"} 한마디 던지면, 열 번 중 몇 번은 ㅋㅋ가 바로 돌아왔어요.`));
     if (hl.laughDay) {
-      b2.push({ type: "lines", lines: [`${fmtDate(hl.laughDay.date)}.`, `ㅋㅋ가 ${num(hl.laughDay.n)}번 나온 날.`] });
-      b2.push({ type: "scene", title: "가장 많이 웃은 날", date: hl.laughDay.date, lines: hl.laughDay.lines });
+      b2.push({ type: "lines", lines: [`${fmtDate(hl.laughDay.date)}.`, `ㅋㅋ가 ${num(hl.laughDay.n)}번 터진 날!`] });
+      b2.push({ type: "scene", title: "ㅋㅋ가 멈추지 않던 날", date: hl.laughDay.date, lines: hl.laughDay.lines });
     }
-    ch.push({ id: "c2", title: "3. 가장 많이 웃은 날", blocks: b2 });
+    ch.push({ id: "c2", title: "3. ㅋㅋㅋ가 멈추지 않던 날", blocks: b2 });
 
-    const per = r.balance.per;
     const b3 = [
-      P("친구 사이엔 '고마워', '걱정돼' 같은 말을 잘 안 하게 돼요. 쑥스러워서요. 그래도 대화를 잘 읽어 보면 숨어 있어요."),
-      P(`"밥은 먹었어?", "괜찮아?" 같은 안부가 ${num(per[A].askCare + per[B].askCare)}번 오갔어요. 응원하고, 위로하고, 걱정하는 말까지 더하면 ${num(f.careOf[A] + f.careOf[B])}번이에요. 그중 조금 더 많이 챙긴 건 ${yeoss(f.carer)}.`),
-      L.thanks.total ? P(`"고마워"는 ${num(L.thanks.total)}번 나왔어요. ${A} ${num(L.thanks[A])}번, ${B} ${num(L.thanks[B])}번. 쑥스러워도 할 말은 했던 두 사람이에요.`) : null
+      P("친구끼리는 '걱정돼', '고마워' 같은 말을 대놓고 잘 안 해요. 오글거리니까요. 대신 툭툭 던지죠. \"밥은 먹었냐\", \"괜찮냐\"처럼요."),
+      P(`그렇게 툭 던진 안부가 ${num(askAll)}번.${careAll > askAll ? ` 응원하고 위로하고 걱정한 말까지 합치면 ${num(careAll)}번이에요.` : ""} 오글거린다면서 할 건 다 했어요. 특히 ${f.carer}!`),
+      L.thanks.total ? P(`"고마워"도 ${num(L.thanks.total)}번이나 나왔어요(${A} ${num(L.thanks[A])}번, ${B} ${num(L.thanks[B])}번). 쑥스러워도 할 말은 하는 사이예요.`) : null
     ].filter(Boolean);
-    ch.push({ id: "c3", title: "4. 서로를 챙긴 말들", blocks: b3 });
+    ch.push({ id: "c3", title: "4. 툭툭 던지는 챙김", blocks: b3 });
 
-    const b4 = [P("어떤 날은 할 말이 끝도 없이 이어져요. 무슨 이야기를 했는지보다, 그렇게 오래 이야기했다는 게 더 기억에 남는 날이요.")];
-    if (r.topDays[0]) b4.push(P(`${fmtDate(r.topDays[0].date)}, 두 사람은 하루에 ${num(r.topDays[0].total)}개의 말풍선을 주고받았어요.`));
-    if (hl.peakDay) b4.push({ type: "scene", title: "가장 길게 이야기한 날", date: hl.peakDay.date, lines: hl.peakDay.lines });
-    ch.push({ id: "c4", title: "5. 가장 길게 이야기한 날", blocks: b4 });
+    const b4 = [P("어떤 날은 할 말이 끝도 없이 쏟아져요. 하나 말하면 하나 더 생각나고, 그러다 보면 몇 시간이 훌쩍 지나 있는 날이요.")];
+    if (r.topDays[0]) b4.push(P(`${fmtDate(r.topDays[0].date)}, 두 사람은 하루에 무려 ${num(r.topDays[0].total)}개의 말풍선을 쏟아냈어요. 평소의 ${Math.round(r.topDays[0].total / Math.max(1, ov.avgPerDay))}배예요!`));
+    if (hl.peakDay) b4.push({ type: "scene", title: "수다가 폭발한 날", date: hl.peakDay.date, lines: hl.peakDay.lines });
+    ch.push({ id: "c4", title: "5. 수다 폭발한 날", blocks: b4 });
 
     const ls = sp.longestSilence;
-    const b5 = [P("오래된 친구는 한동안 연락이 없어도 어색하지 않아요. 다시 말을 거는 순간, 어제 이야기하던 것처럼 이어지니까요.")];
-    if (ls && ls.hours >= 24) b5.push(P(`가장 오래 조용했던 건 ${num1(ls.hours / 24)}일이에요(${fmtDate(ls.from)}부터). 그 침묵을 먼저 깬 건 ${yeoss(ls.breaker)}.`));
-    if (f.trend) b5.push(P(f.trend.change <= -0.25 ? `요즘은 예전보다 조금 뜸해졌어요(하루 ${num1(f.trend.oldRate)}개 → ${num1(f.trend.recRate)}개). 하지만 뜸해지는 건 멀어지는 게 아니라, 각자의 하루가 바빠졌다는 뜻일 때가 많아요.` : f.trend.change >= 0.2 ? `요즘은 오히려 예전보다 더 자주 이야기해요(하루 ${num1(f.trend.oldRate)}개 → ${num1(f.trend.recRate)}개).` : "요즘도 예전처럼 꾸준히 이야기하고 있어요."));
-    ch.push({ id: "c5", title: "6. 조용했던 시간, 그리고 다시", blocks: b5 });
+    const b5 = [P("찐친의 특징 하나. 한참 연락이 없어도 어색하지 않아요. 다시 말을 거는 순간, 어제 하던 얘기처럼 바로 이어지니까요.")];
+    if (ls && ls.hours >= 24) b5.push(P(`가장 오래 잠수 탄 건 ${num1(ls.hours / 24)}일(${fmtDate(ls.from)}부터). 그리고 그 잠수를 먼저 끝낸 건 ${yeoss(ls.breaker)}! 역시 먼저 연락하는 쪽이 이기는 거예요.`));
+    if (f.trend) b5.push(P(f.trend.change <= -0.25 ? `요즘은 조금 뜸해졌어요(하루 ${num1(f.trend.oldRate)}개 → ${num1(f.trend.recRate)}개). 괜찮아요. 각자 바빠진 것뿐이에요. 찐친은 이 정도로 안 멀어져요.` : f.trend.change >= 0.2 ? `그리고 요즘은 오히려 더 시끄러워졌어요(하루 ${num1(f.trend.oldRate)}개 → ${num1(f.trend.recRate)}개)!` : "요즘도 여전히, 꾸준히 떠들고 있어요."));
+    ch.push({ id: "c5", title: "6. 잠수, 그리고 귀환", blocks: b5 });
 
-    ch.push({ id: "c6", title: "7. 두 사람은 좋은 친구였나요", blocks: [
-      { type: "lines", lines: ["그래서, 두 사람은 좋은 친구였나요?"] },
-      P("쉽게 대답하지 못할 것 같아요. 서운한 날도, 답장이 늦은 날도, 한동안 연락이 없던 날도 있었으니까요."),
-      { type: "aside", big: true, text: "하지만 한 가지는 확실해요." },
-      P(`두 사람은 ${num(lb[A] + lb[B])}번 같이 웃었고, ${num(per[A].askCare + per[B].askCare)}번 서로의 하루를 물었고, ${num(f.careOf[A] + f.careOf[B])}번 서로를 챙겼고, 조용해질 때마다 ${num(sp.init[A] + sp.init[B])}번 다시 먼저 말을 걸었어요. 그건 좋은 친구라는 뜻이에요.`),
-      ...[`${and(A, B)}에게.`, `${num(days)}일 동안의 대화를 처음부터 끝까지 읽었어요. 거기엔 시시한 농담과, 별것 아닌 하루와, 가끔은 진지한 고민이 있었어요.`, "좋은 친구는 인생의 대단한 순간보다 평범한 하루를 더 많이 함께하는 사람이에요. 두 사람이 바로 그런 사이였어요. 앞으로도 시시한 이야기를 제일 먼저 나눌 수 있는 친구로 오래 남아 주세요.", "— TALK VIEW"].map(t => ({ type: "p", letter: true, text: t }))
+    ch.push({ id: "c6", title: "7. 그래서, 찐친인가요?", blocks: [
+      { type: "lines", lines: ["그래서, 두 사람은 찐친인가요?"] },
+      P("음, 바로 대답하기는 좀 그래요. 답장 늦은 날도 있었고, 잠수 탄 날도 있었고, 서로 놀린 날은 셀 수도 없으니까요."),
+      { type: "aside", big: true, text: "근데 한 가지는 확실해요." },
+      P(`두 사람은 ${num(laughs)}번 같이 웃었고, ${num(askAll)}번 서로의 하루를 물었고,${careAll > askAll ? ` 응원하고 걱정한 말까지 ${num(careAll)}번 서로를 챙겼고,` : ""} 조용해질 때마다 ${num(sp.init[A] + sp.init[B])}번 다시 먼저 말을 걸었어요. 이 정도면 찐친 인정이에요!`),
+      ...[`${and(A, B)}에게!`, `${num(days)}일 치 수다를 다 읽었어요. 시시한 농담, 아무 말 대잔치, 가끔 진지한 고민까지. 읽는 내내 저도 좀 웃었어요.`, "좋은 친구는 대단한 순간보다 별거 없는 하루를 더 많이 같이 보내는 사람이에요. 두 사람이 딱 그래요. 앞으로도 웃긴 거 보면 제일 먼저 보내 주는 사이로, 오래오래 시끄럽게 지내요!", "— TALK VIEW"].map(t => ({ type: "p", letter: true, text: t }))
     ] });
 
-    const ep = [P(`어쩌면 오늘도 ${eunneun(A)} 웃긴 걸 보다가 제일 먼저 ${eulreul(B)} 떠올렸을지도 몰라요. 그리고 ${B}도 그랬을 거예요.`)];
-    if (hl.latest) ep.push({ type: "scene", title: "가장 최근의 대화", date: hl.latest.date, lines: hl.latest.lines });
-    ep.push(P(`첫 인사부터 이 마지막 대화까지 ${num(days)}일. 이 우정은 아직 진행 중이에요.`));
-    ep.push({ type: "lines", lines: ["오늘은, 먼저 안부 한 줄 보내 보세요."] });
+    const ep = [P(`아마 오늘도 ${eunneun(A)} 웃긴 걸 보다가 ${eulreul(B)} 떠올렸을 거예요. 그리고 ${B}도 똑같았을 거고요.`)];
+    if (hl.latest) ep.push({ type: "scene", title: "가장 최근의 수다", date: hl.latest.date, lines: hl.latest.lines });
+    ep.push(P(`첫 인사부터 지금까지 ${num(days)}일. 그리고 이 수다는 아직 끝나지 않았어요.`));
+    ep.push({ type: "lines", lines: ["오늘은 아무 이유 없이, \"ㅋㅋ 뭐해?\" 한 줄 보내 보세요!"] });
     ch.push({ id: "epilogue", title: "에필로그", blocks: ep });
     return { cover, chapters: ch };
   }
